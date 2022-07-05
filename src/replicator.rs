@@ -15,6 +15,8 @@
 // limitations under the License.
 //
 
+#![allow(non_upper_case_globals)]
+
 use super::*;
 use super::c_api::*;
 
@@ -121,15 +123,19 @@ impl Replicator {
     }
 
     /** Starts a replicator, asynchronously. Does nothing if it's already started. */
-    pub fn start(&mut self) {
-        todo!()
+    pub fn start(&mut self, reset_checkpoint: bool) {
+        unsafe {
+            CBLReplicator_Start(self._ref, reset_checkpoint);
+        }
     }
 
     /** Stops a running replicator, asynchronously. Does nothing if it's not already started.
         The replicator will call your \ref CBLReplicatorChangeListener with an activity level of
         \ref kCBLReplicatorStopped after it stops. Until then, consider it still active. */
     pub fn stop(&mut self) {
-        todo!()
+        unsafe {
+            CBLReplicator_Stop(self._ref);
+        }
     }
 
     /** Informs the replicator whether it's considered possible to reach the remote host with
@@ -137,8 +143,10 @@ impl Replicator {
         replicator's behavior while it's in the Offline state:
         * Setting it to false will cancel any pending retry and prevent future automatic retries.
         * Setting it back to true will initiate an immediate retry.*/
-    pub fn set_host_reachable(&mut self, _reachable: bool) {
-        todo!()
+    pub fn set_host_reachable(&mut self, reachable: bool) {
+        unsafe {
+            CBLReplicator_SetHostReachable(self._ref, reachable);
+        }
     }
 
     /** Puts the replicator in or out of "suspended" state. The default is false.
@@ -146,8 +154,10 @@ impl Replicator {
           it will not attempt to reconnect while it's suspended.
         * Setting suspended=false causes the replicator to attempt to reconnect, _if_ it was
           connected when suspended, and is still in Offline state. */
-    pub fn set_suspended(&mut self, _suspended: bool) {
-        todo!()
+    pub fn set_suspended(&mut self, suspended: bool) {
+        unsafe {
+            CBLReplicator_SetSuspended(self._ref, suspended);
+        }
     }
 
 }
@@ -170,6 +180,19 @@ pub enum ReplicatorActivityLevel {
     Busy                // The replicator is actively transferring data.
 }
 
+impl From<u8> for ReplicatorActivityLevel {
+    fn from(level: u8) -> Self {
+        match level as u32 {
+            kCBLReplicatorStopped => ReplicatorActivityLevel::Stopped,
+            kCBLReplicatorOffline => ReplicatorActivityLevel::Offline,
+            kCBLReplicatorConnecting => ReplicatorActivityLevel::Connecting,
+            kCBLReplicatorIdle => ReplicatorActivityLevel::Idle,
+            kCBLReplicatorBusy => ReplicatorActivityLevel::Busy,
+            _ => unreachable!(),
+        }
+    }
+}
+
 /** The current progress status of a Replicator. The `fraction_complete` ranges from 0.0 to 1.0 as
     replication progresses. The value is very approximate and may bounce around during replication;
     making it more accurate would require slowing down the replicator and incurring more load on the
@@ -184,6 +207,19 @@ pub struct ReplicatorStatus {
     pub activity: ReplicatorActivityLevel,  // Current state
     pub progress: ReplicatorProgress,       // Approximate fraction complete
     pub error:    Result<()>                // Error, if any
+}
+
+impl From<CBLReplicatorStatus> for ReplicatorStatus {
+    fn from(status: CBLReplicatorStatus) -> Self {
+        ReplicatorStatus {
+            activity: status.activity.into(),
+            progress: ReplicatorProgress {
+                fraction_complete: status.progress.complete,
+                document_count: status.progress.documentCount,
+            },
+            error: check_error(&status.error),
+        }
+    }
 }
 
 /** A callback that notifies you when the replicator's status changes. */
@@ -211,14 +247,32 @@ impl Replicator {
 
     /** Returns the replicator's current status. */
     pub fn status(&self) -> ReplicatorStatus {
-        todo!()
+        unsafe {
+            CBLReplicator_Status(self._ref).into()
+        }
     }
 
     /** Indicates which documents have local changes that have not yet been pushed to the server
         by this replicator. This is of course a snapshot, that will go out of date as the replicator
         makes progress and/or documents are saved locally. */
     pub fn pending_document_ids(&self) -> Result<HashSet<String>> {
-        todo!()
+        //todo!()
+        unsafe {
+            let mut error = CBLError::default();
+            let docs: FLDict = CBLReplicator_PendingDocumentIDs(self._ref, &mut error as *mut CBLError);
+
+            check_error(&error).and_then(|()| {
+                if docs.is_null() {
+                    return Err(Error::default());
+                }
+
+                let dict = Dict::wrap(docs, self);
+                Ok(dict
+                    .into_iter()
+                    .map(|tuple| tuple.0.to_string())
+                    .collect::<HashSet<String>>())
+            })
+        }
     }
 
     /** Indicates whether the document with the given ID has local changes that have not yet been
