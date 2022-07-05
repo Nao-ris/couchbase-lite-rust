@@ -101,7 +101,8 @@ pub struct ReplicatorConfiguration<'c> {
 
 /** A background task that syncs a \ref Database with a remote server or peer. */
 pub struct Replicator {
-    _ref: *mut CBLReplicator
+    _ref: *mut CBLReplicator,
+    has_ownership: bool,
 }
 
 impl Replicator {
@@ -164,7 +165,13 @@ impl Replicator {
 }
 
 impl Drop for Replicator {
-    fn drop(&mut self) { unsafe { CBL_Release(self._ref as *mut CBLRefCounted) } }
+    fn drop(&mut self) {
+        unsafe {
+            if self.has_ownership {
+                CBL_Release(self._ref as *mut CBLRefCounted)
+            }
+        }
+    }
 }
 
 
@@ -225,14 +232,63 @@ impl From<CBLReplicatorStatus> for ReplicatorStatus {
 
 /** A callback that notifies you when the replicator's status changes. */
 pub type ReplicatorChangeListener = fn(&Replicator, ReplicatorStatus);
+#[no_mangle]
+unsafe extern "C" fn c_replicator_change_listener(
+    context: *mut ::std::os::raw::c_void,
+    replicator: *mut CBLReplicator,
+    status: *const CBLReplicatorStatus,
+) {
+    let callback: ReplicatorChangeListener = std::mem::transmute(context);
+
+    let replicator = Replicator {
+        _ref: replicator,
+        has_ownership: false,
+    };
+    let status: ReplicatorStatus = (*status).into();
+
+    callback(&replicator, status);
+}
+
+/** A callback that notifies you when documents are replicated. */
+pub type ReplicatedDocumentListener = fn(&Replicator, Direction, Vec<ReplicatedDocument>);
+unsafe extern "C" fn c_replicator_document_change_listener(
+    context: *mut ::std::os::raw::c_void,
+    replicator: *mut CBLReplicator,
+    is_push: bool,
+    num_documents: u32,
+    documents: *const CBLReplicatedDocument,
+) {
+    let callback: ReplicatedDocumentListener = std::mem::transmute(context);
+
+    let replicator = Replicator {
+        _ref: replicator,
+        has_ownership: false,
+    };
+    let direction = if is_push { Direction::Pushed } else { Direction::Pulled};
+
+    let mut vec_repl_docs = Vec::new();
+    for i in 0..num_documents {
+        if let Some(document) = documents.offset(i as isize).as_ref() {
+            if let Some(doc_id) = document.ID.to_string() {
+                vec_repl_docs.push(ReplicatedDocument {
+                    id: doc_id,
+                    flags: document.flags,
+                    error: check_error(&document.error),
+                })
+            }
+        }
+    }
+
+    callback(&replicator, direction, vec_repl_docs);
+}
 
 /** Flags describing a replicated document. */
 pub static DELETED        : u32 = kCBLDocumentFlagsDeleted;
 pub static ACCESS_REMOVED : u32 = kCBLDocumentFlagsAccessRemoved;
 
 /** Information about a document that's been pushed or pulled. */
-pub struct ReplicatedDocument<'d> {
-    pub id:     &'d str,                    // The document ID
+pub struct ReplicatedDocument {
+    pub id:     String,                    // The document ID
     pub flags:  u32,                        // Indicates whether the document was deleted or removed
     pub error:  Result<()>                  // Error, if document failed to replicate
 }
@@ -240,9 +296,6 @@ pub struct ReplicatedDocument<'d> {
 /** Direction of document transfer. */
 #[derive(Debug)]
 pub enum Direction {Pulled, Pushed }
-
-/** A callback that notifies you when documents are replicated. */
-pub type ReplicatedDocumentListener = fn(&Replicator, Direction, Vec<ReplicatedDocument>);
 
 impl Replicator {
 
@@ -289,12 +342,24 @@ impl Replicator {
     }
 
     /** Adds a listener that will be called when the replicator's status changes. */
-    pub fn add_change_listener(&mut self, _listener: ReplicatorChangeListener) -> ListenerToken {
-        todo!()
+    pub fn add_change_listener(&mut self, listener: ReplicatorChangeListener) -> ListenerToken {
+        unsafe {
+            let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
+
+            ListenerToken {
+                _ref: CBLReplicator_AddChangeListener(self._ref, Some(c_replicator_change_listener), callback)
+            }
+        }
     }
 
     /** Adds a listener that will be called when documents are replicated. */
-    pub fn add_document_listener(&mut self, _listener: ReplicatedDocumentListener) -> ListenerToken {
-        todo!()
+    pub fn add_document_listener(&mut self, listener: ReplicatedDocumentListener) -> ListenerToken {
+        unsafe {
+            let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
+
+            ListenerToken {
+                _ref: CBLReplicator_AddDocumentReplicationListener(self._ref, Some(c_replicator_document_change_listener), callback)
+            }
+        }
     }
 }

@@ -44,7 +44,7 @@ enum_from_primitive! {
 
 type ChangeListener = fn(db: &Database, doc_ids: Vec<String>);
 #[no_mangle]
-unsafe extern "C" fn c_change_listener(
+unsafe extern "C" fn c_database_change_listener(
     context: *mut ::std::os::raw::c_void,
     db: *const CBLDatabase,
     num_docs: ::std::os::raw::c_uint,
@@ -70,7 +70,7 @@ unsafe extern "C" fn c_change_listener(
 
 type BufferNotifications = fn(db: &Database);
 #[no_mangle]
-unsafe extern "C" fn c_buffer_notifications(
+unsafe extern "C" fn c_database_buffer_notifications(
     context: *mut ::std::os::raw::c_void,
     db: *mut CBLDatabase
 ) {
@@ -235,7 +235,7 @@ impl Database {
             let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
 
             ListenerToken {
-                _ref: CBLDatabase_AddChangeListener(self._ref, Some(c_change_listener), callback)
+                _ref: CBLDatabase_AddChangeListener(self._ref, Some(c_database_change_listener), callback)
             }
         }
     }
@@ -248,7 +248,7 @@ impl Database {
         unsafe {
             let callback: *mut ::std::os::raw::c_void = std::mem::transmute(callback);
 
-            CBLDatabase_BufferNotifications(self._ref, Some(c_buffer_notifications), callback);
+            CBLDatabase_BufferNotifications(self._ref, Some(c_database_buffer_notifications), callback);
         }
     }
 
