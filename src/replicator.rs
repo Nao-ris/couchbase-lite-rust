@@ -17,12 +17,13 @@
 
 #![allow(non_upper_case_globals)]
 
-use super::*;
-use super::c_api::*;
+use slice::as_slice;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use super::*;
+use super::c_api::*;
 
 // WARNING: THIS API IS UNIMPLEMENTED SO FAR
 
@@ -256,7 +257,6 @@ impl Replicator {
         by this replicator. This is of course a snapshot, that will go out of date as the replicator
         makes progress and/or documents are saved locally. */
     pub fn pending_document_ids(&self) -> Result<HashSet<String>> {
-        //todo!()
         unsafe {
             let mut error = CBLError::default();
             let docs: FLDict = CBLReplicator_PendingDocumentIDs(self._ref, &mut error as *mut CBLError);
@@ -280,8 +280,15 @@ impl Replicator {
 
         This is equivalent to, but faster than, calling \ref pending_document_ids and
         checking whether the result contains \p docID. See that function's documentation for details. */
-    pub fn is_document_pending(_doc_id: &str) -> Result<bool> {
-        todo!()
+    pub fn is_document_pending(&self, doc_id: &str) -> Result<bool> {
+        unsafe {
+            let mut error = CBLError::default();
+            let result = CBLReplicator_IsDocumentPending(self._ref, as_slice(doc_id), &mut error as *mut CBLError);
+
+            check_error(&error).and_then(|()| {
+                Ok(result)
+            })
+        }
     }
 
     /** Adds a listener that will be called when the replicator's status changes. */
