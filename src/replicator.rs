@@ -267,10 +267,7 @@ impl Replicator {
                 }
 
                 let dict = Dict::wrap(docs, self);
-                Ok(dict
-                    .into_iter()
-                    .map(|tuple| tuple.0.to_string())
-                    .collect::<HashSet<String>>())
+                Ok(dict.to_keys_hash_set())
             })
         }
     }
