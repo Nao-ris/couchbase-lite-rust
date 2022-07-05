@@ -45,12 +45,20 @@ fn in_transaction() {
 
     db_exec.spawn(move |db| {
         if let Some(db) = db.as_mut() {
-            let result = db.in_transaction(transaction_callback);
+            let result = db.in_transaction(|db| {
+                let mut doc = Document::new_with_id("document");
+                db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+                Ok("document".to_string())
+            });
 
             assert!(result.is_ok());
             assert_eq!(result.unwrap(), "document");
 
-            let result = db.in_transaction(transaction_callback_error);
+            let result = db.in_transaction(|db| -> Result<String> {
+                let mut doc = Document::new_with_id("document_error");
+                db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+                Err(couchbase_lite::Error::default())
+            });
 
             assert!(result.is_err());
 
@@ -61,18 +69,6 @@ fn in_transaction() {
 
     utils::close_db(db_thread, db_exec);
     utils::delete_db(path);
-}
-
-fn transaction_callback(db: &mut Database) -> Result<String> {
-    let mut doc = Document::new_with_id("document");
-    db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
-    Ok("document".to_string())
-}
-
-fn transaction_callback_error(db: &mut Database) -> Result<String> {
-    let mut doc = Document::new_with_id("document_error");
-    db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
-    Err(couchbase_lite::Error::default())
 }
 
 lazy_static! {
