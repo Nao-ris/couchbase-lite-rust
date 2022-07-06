@@ -56,16 +56,13 @@ unsafe extern "C" fn c_database_change_listener(
         _ref: db as *mut CBLDatabase,
         has_ownership: false,
     };
-    let mut vec_doc_ids = Vec::new();
-    for i in 0..num_docs {
-        if let Some(doc_id) = c_doc_ids.offset(i as isize).as_ref() {
-            if let Some(doc_id) = doc_id.to_string() {
-                vec_doc_ids.push(doc_id.to_string())
-            }
-        }
-    }
 
-    callback(&database, vec_doc_ids);
+    let doc_ids = std::slice::from_raw_parts(c_doc_ids, num_docs as usize)
+        .iter()
+        .filter_map(|doc_id| doc_id.to_string())
+        .collect();
+
+    callback(&database, doc_ids);
 }
 
 type BufferNotifications = fn(db: &Database);

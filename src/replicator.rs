@@ -116,14 +116,6 @@ impl Replicator {
         todo!()
     }
 
-    /** Instructs the replicator to ignore existing checkpoints the next time it runs.
-        This will cause it to scan through all the documents on the remote database, which takes
-        a lot longer, but it can resolve problems with missing documents if the client and
-        server have gotten out of sync somehow. */
-    pub fn reset_checkpoint(&mut self) {
-        todo!()
-    }
-
     /** Starts a replicator, asynchronously. Does nothing if it's already started. */
     pub fn start(&mut self, reset_checkpoint: bool) {
         unsafe {
@@ -266,20 +258,22 @@ unsafe extern "C" fn c_replicator_document_change_listener(
     };
     let direction = if is_push { Direction::Pushed } else { Direction::Pulled};
 
-    let mut vec_repl_docs = Vec::new();
-    for i in 0..num_documents {
-        if let Some(document) = documents.offset(i as isize).as_ref() {
+    let repl_documents = std::slice::from_raw_parts(documents, num_documents as usize)
+        .iter()
+        .filter_map(|document| {
             if let Some(doc_id) = document.ID.to_string() {
-                vec_repl_docs.push(ReplicatedDocument {
+                Some(ReplicatedDocument {
                     id: doc_id,
                     flags: document.flags,
                     error: check_error(&document.error),
                 })
+            } else {
+                None
             }
-        }
-    }
+        })
+        .collect();
 
-    callback(&replicator, direction, vec_repl_docs);
+    callback(&replicator, direction, repl_documents);
 }
 
 /** Flags describing a replicated document. */
