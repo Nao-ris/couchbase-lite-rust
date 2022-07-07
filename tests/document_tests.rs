@@ -119,8 +119,29 @@ fn database_save_document() {
 
 #[test]
 fn database_save_document_resolving() {
-    utils::with_db(|_db| {
-        // TODO
+    utils::with_db(|db| {
+        {
+            let mut document = Document::new_with_id("foo");
+            db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
+        }
+        {
+            let mut document = db.get_document("foo").unwrap();
+            {
+                let mut document = db.get_document("foo").unwrap();
+                document.mutable_properties().at("foo").put_i64(1);
+                db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
+            }
+            document.mutable_properties().at("foo").put_i64(2);
+            document = db.save_document_resolving(&mut document, |document_a, document_b| {
+                let property_a = document_a.properties().get("foo").as_i64_or_0();
+                let property_b = document_b.properties().get("foo").as_i64_or_0();
+                document_a.mutable_properties().at("foo").put_i64(property_a + property_b);
+                true
+            }).expect("save_document_resolving");
+            assert_eq!(document.properties().get("foo").as_i64_or_0(), 3);
+            document = db.get_document("foo").unwrap();
+            assert_eq!(document.properties().get("foo").as_i64_or_0(), 3);
+        }
     });
 }
 
