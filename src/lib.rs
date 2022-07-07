@@ -53,7 +53,7 @@ pub use replicator::*;
 
 
 /// A time value for document expiration. Defined as milliseconds since the Unix epoch (1/1/1970.)
-pub struct Timestamp(i64);
+pub struct Timestamp(pub i64);
 
 
 /// An opaque token representing a registered listener.
