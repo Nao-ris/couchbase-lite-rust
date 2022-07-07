@@ -105,6 +105,19 @@ impl Database {
         }
     }
 
+    pub fn delete_document(&mut self, doc: &Document, concurrency: ConcurrencyControl) -> Result<()> {
+        let c_concurrency = concurrency as u8;
+        unsafe {
+            return check_bool(|error| CBLDatabase_DeleteDocumentWithConcurrencyControl(self._ref, doc._ref, c_concurrency, error));
+        }
+    }
+
+    pub fn purge_document(&mut self, doc: &Document) -> Result<()> {
+        unsafe {
+            return check_bool(|error| CBLDatabase_PurgeDocument(self._ref, doc._ref, error));
+        }
+    }
+
     pub fn purge_document_by_id(&mut self, id: &str) -> Result<()> {
         unsafe {
             return check_bool(|error| CBLDatabase_PurgeDocumentByID(self._ref, as_slice(id), error));
