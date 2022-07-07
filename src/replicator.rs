@@ -154,8 +154,8 @@ pub struct ProxySettings {
     pub password:   Option<String>     // Password for proxy auth
 }
 
-impl From<CBLProxySettings> for ProxySettings {
-    fn from(proxy_settings: CBLProxySettings) -> Self {
+impl From<&CBLProxySettings> for ProxySettings {
+    fn from(proxy_settings: &CBLProxySettings) -> Self {
         ProxySettings {
             proxy_type: proxy_settings.type_.into(),
             hostname: proxy_settings.hostname.to_string(),
@@ -397,15 +397,14 @@ pub struct ReplicatorConfiguration<'c> {
     pub proxy:                     Option<ProxySettings>,            // HTTP client proxy settings
     pub headers:                   Dict<'c>,                     // Extra HTTP headers to add to the WebSocket request
     //-- TLS settings:
-    pub pinned_server_certificate: Option<Vec<u8>>,                  // An X.509 cert to "pin" TLS connections to (PEM or DER)
-    pub trusted_root_certificates: Option<Vec<u8>>,                  // Set of anchor certs (PEM format)
+    pub pinned_server_certificate: Option<&'c [u8]>,                  // An X.509 cert to "pin" TLS connections to (PEM or DER)
+    pub trusted_root_certificates: Option<&'c [u8]>,                  // Set of anchor certs (PEM format)
     //-- Filtering:
-    pub channels:                  Option<Array<'c>>,             // Optional set of channels to pull from
-    pub document_ids:              Option<Array<'c>>,             // Optional set of document IDs to replicate
+    pub channels:                  Array<'c>,             // Optional set of channels to pull from
+    pub document_ids:              Array<'c>,             // Optional set of document IDs to replicate
     pub push_filter:               Option<ReplicationFilter>,        // Optional callback to filter which docs are pushed
     pub pull_filter:               Option<ReplicationFilter>,        // Optional callback to validate incoming docs
     pub conflict_resolver:         Option<ConflictResolver>,         // Optional conflict-resolver callback
-    pub context:                   *mut ::std::os::raw::c_void,      //< Arbitrary value that will be passed to callbacks
     //-- Property Encryption
     pub property_encryptor:        Option<PropertyEncryptor>,	     //< Optional callback to encrypt \ref CBLEncryptable values.
     pub property_decryptor:        Option<PropertyDecryptor>,        //< Optional callback to decrypt encrypted \ref CBLEncryptable values.
@@ -425,12 +424,12 @@ impl<'c> From<CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
             max_attempt_wait_time: config.maxAttemptWaitTime,
             heartbeat: config.heartbeat,
             authenticator: if config.authenticator.is_null() { None } else { Some(Authenticator { _ref: config.authenticator }) },
-            proxy: config.proxy.as_ref().map(|proxy| proxy.into()),//if config.proxy.is_null() { None } else { Some(config.proxy.into()) },
+            proxy: config.proxy.as_ref().map(|proxy| proxy.into()),
             headers: Dict::wrap(config.headers, &config.headers),
             pinned_server_certificate: config.pinnedServerCertificate.as_byte_array(),
             trusted_root_certificates: config.trustedRootCertificates.as_byte_array(),
-            channels: Array { _ref: config.channels, _owner: config.channels },
-            document_ids: Array { _ref: config.documentIDs, _owner: config.documentIDs },
+            channels: Array::wrap(config.channels, &config.channels),
+            document_ids: Array::wrap(config.documentIDs, &config.documentIDs),
             push_filter: context.push_filter,
             pull_filter: context.pull_filter,
             conflict_resolver: context.conflict_resolver,
@@ -454,23 +453,23 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
             endpoint: config.endpoint._ref,
             replicatorType: config.replicator_type.into(),
             continuous: config.continuous,
-            disableAutoPurge: config.disableAutoPurge,
+            disableAutoPurge: config.disable_auto_purge,
             maxAttempts: config.max_attempts,
             maxAttemptWaitTime: config.max_attempt_wait_time,
             heartbeat: config.heartbeat,
             authenticator: config.authenticator.map(|a| a._ref).unwrap_or(ptr::null_mut()),
-            proxy: config.proxy.map(|p| p.into()).or(ptr::null()),
+            proxy: config.proxy.map(|p| p.into()).unwrap_or(ptr::null()),
             headers: config.headers._ref,
             pinnedServerCertificate: config.pinned_server_certificate.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
             trustedRootCertificates: config.trusted_root_certificates.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
             channels: config.channels._ref,
             documentIDs: config.document_ids._ref,
-            pushFilter: if context.push_filter.is_some() { c_replication_push_filter } else { None },
-            pullFilter: if context.pull_filter.is_some() { c_replication_pull_filter } else { None },
-            conflictResolver: if context.conflict_resolver.is_some() { c_replication_conflict_resolver } else { None },
+            pushFilter: context.push_filter.and(Some(c_replication_push_filter)),
+            pullFilter: context.pull_filter.and(Some(c_replication_pull_filter)),
+            conflictResolver: context.conflict_resolver.and(Some(c_replication_conflict_resolver)),
             context: std::mem::transmute(context),
-            propertyEncryptor: if context.push_filter.is_some() { c_property_encryptor } else { None },
-            propertyDecryptor: if context.push_filter.is_some() { c_property_decryptor } else { None },
+            propertyEncryptor: context.push_filter.and(Some(c_property_encryptor)),
+            propertyDecryptor: context.push_filter.and(Some(c_property_decryptor)),
         }
     }
 }
