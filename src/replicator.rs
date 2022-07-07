@@ -19,8 +19,8 @@
 
 use slice::as_slice;
 
-use std::collections::HashMap;
 use std::collections::HashSet;
+use std::ptr;
 
 use super::*;
 use super::c_api::*;
@@ -32,17 +32,70 @@ use super::c_api::*;
 
 
 /** Represents the location of a database to replicate with. */
-pub enum Endpoint<'e> {
-    WithURL     (String),
-    WithLocalDB (&'e Database)
+pub struct Endpoint {
+    pub _ref: *mut CBLEndpoint
+}
+
+impl Endpoint {
+    pub fn new_with_url(url: String) -> Result<Self> {
+        unsafe {
+            let mut error = CBLError::default();
+            let endpoint: *mut CBLEndpoint = CBLEndpoint_CreateWithURL(as_slice(&url), &mut error as *mut CBLError);
+
+            check_error(&error).and_then(|()| {
+                Ok(Self {
+                    _ref: endpoint
+                })
+            })
+        }
+    }
+
+    pub fn new_with_local_db(db: &Database) -> Self {
+        unsafe {
+            Self {
+                _ref: CBLEndpoint_CreateWithLocalDB(db._ref)
+            }
+        }
+    }
+}
+
+impl Drop for Endpoint {
+    fn drop(&mut self) {
+        unsafe {
+            CBLEndpoint_Free(self._ref);
+        }
+    }
 }
 
 
-pub enum Authenticator<'a> {
-    None,
-    Basic   {username: &'a str, password: &'a str},
-    Session {session_id: &'a str},
-    Cookie  {name: &'a str, value: &'a str}
+pub struct Authenticator {
+    _ref: *mut CBLAuthenticator
+}
+
+impl Authenticator {
+    pub fn create_password(username: String, password: String) -> Self {
+        unsafe {
+            Self {
+                _ref: CBLAuth_CreatePassword(as_slice(&username), as_slice(&password))
+            }
+        }
+    }
+
+    pub fn create_session(session_id: String, cookie_name: String) -> Self {
+        unsafe {
+            Self {
+                _ref: CBLAuth_CreateSession(as_slice(&session_id), as_slice(&cookie_name))
+            }
+        }
+    }
+}
+
+impl Drop for Authenticator {
+    fn drop(&mut self) {
+        unsafe {
+            CBLAuth_Free(self._ref);
+        }
+    }
 }
 
 
@@ -50,24 +103,123 @@ pub enum Authenticator<'a> {
 #[derive(Debug)]
 pub enum ReplicatorType { PushAndPull, Push, Pull }
 
+impl From<CBLReplicatorType> for ReplicatorType {
+    fn from(repl_type: CBLReplicatorType) -> Self {
+        match repl_type as u32 {
+            kCBLReplicatorTypePushAndPull => ReplicatorType::PushAndPull,
+            kCBLReplicatorTypePush => ReplicatorType::Push,
+            kCBLReplicatorTypePull => ReplicatorType::Pull,
+            _ => unreachable!(),
+        }
+    }
+}
+impl From<ReplicatorType> for CBLReplicatorType {
+    fn from(repl_type: ReplicatorType) -> Self {
+        match repl_type {
+            ReplicatorType::PushAndPull => kCBLReplicatorTypePushAndPull as u8,
+            ReplicatorType::Push => kCBLReplicatorTypePush as u8,
+            ReplicatorType::Pull => kCBLReplicatorTypePull as u8,
+        }
+    }
+}
 
 /** Types of proxy servers, for CBLProxySettings. */
 #[derive(Debug)]
 pub enum ProxyType { HTTP, HTTPS }
 
+impl From<CBLProxyType> for ProxyType {
+    fn from(proxy_type: CBLProxyType) -> Self {
+        match proxy_type as u32 {
+            kCBLProxyHTTP => ProxyType::HTTP,
+            kCBLProxyHTTPS => ProxyType::HTTPS,
+            _ => unreachable!(),
+        }
+    }
+}
+impl From<ProxyType> for CBLProxyType {
+    fn from(proxy_type: ProxyType) -> Self {
+        match proxy_type {
+            ProxyType::HTTP => kCBLProxyHTTP as u8,
+            ProxyType::HTTPS => kCBLProxyHTTPS as u8,
+        }
+    }
+}
+
 /** Proxy settings for the replicator. */
-pub struct ProxySettings<'p> {
+pub struct ProxySettings {
     pub proxy_type: ProxyType,          // Type of proxy
-    pub hostname:   &'p str,            // Proxy server hostname or IP address
+    pub hostname:   Option<String>,            // Proxy server hostname or IP address
     pub port:       u16,                // Proxy server port
-    pub username:   Option<&'p str>,    // Username for proxy auth
-    pub password:   Option<&'p str>     // Password for proxy auth
+    pub username:   Option<String>,    // Username for proxy auth
+    pub password:   Option<String>     // Password for proxy auth
+}
+
+impl From<CBLProxySettings> for ProxySettings {
+    fn from(proxy_settings: CBLProxySettings) -> Self {
+        ProxySettings {
+            proxy_type: proxy_settings.type_.into(),
+            hostname: proxy_settings.hostname.to_string(),
+            port: proxy_settings.port,
+            username: proxy_settings.username.to_string(),
+            password: proxy_settings.password.to_string(),
+        }
+    }
+}
+impl From<ProxySettings> for CBLProxySettings {
+    fn from(proxy_settings: ProxySettings) -> Self {
+        CBLProxySettings {
+            type_: proxy_settings.proxy_type.into(),
+            hostname: proxy_settings.hostname.map(|s| as_slice(&s)).unwrap_or(slice::NULL_SLICE),
+            port: proxy_settings.port,
+            username: proxy_settings.username.map(|s| as_slice(&s)).unwrap_or(slice::NULL_SLICE),
+            password: proxy_settings.password.map(|s| as_slice(&s)).unwrap_or(slice::NULL_SLICE),
+        }
+    }
 }
 
 
 /** A callback that can decide whether a particular document should be pushed or pulled. */
-pub type ReplicationFilter =  fn(document: &Document,
-                                 is_deleted: bool) -> bool;
+pub type ReplicationFilter =  fn(document: &Document, is_deleted: bool, is_access_removed: bool) -> bool;
+#[no_mangle]
+unsafe extern "C" fn c_replication_push_filter(
+    context: *mut ::std::os::raw::c_void,
+    document: *mut CBLDocument,
+    flags: CBLDocumentFlags,
+) -> bool {
+    let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+
+    let document = Document {
+        _ref: document as *mut CBLDocument,
+        has_ownership: false,
+    };
+
+    let (is_deleted, is_access_removed) = read_document_flags(flags);
+
+    repl_conf_context.push_filter
+        .map(|callback| callback(&document, is_deleted, is_access_removed))
+        .unwrap_or(false)
+}
+unsafe extern "C" fn c_replication_pull_filter(
+    context: *mut ::std::os::raw::c_void,
+    document: *mut CBLDocument,
+    flags: CBLDocumentFlags,
+) -> bool {
+    let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+
+    let document = Document {
+        _ref: document as *mut CBLDocument,
+        has_ownership: false,
+    };
+
+    let (is_deleted, is_access_removed) = read_document_flags(flags);
+
+    repl_conf_context.pull_filter
+        .map(|callback| callback(&document, is_deleted, is_access_removed))
+        .unwrap_or(false)
+}
+fn read_document_flags(flags: CBLDocumentFlags) -> (bool, bool) {
+    (flags & DELETED != 0, flags & ACCESS_REMOVED != 0)
+}
 
 /** Conflict-resolution callback for use in replications. This callback will be invoked
     when the replicator finds a newer server-side revision of a document that also has local
@@ -75,25 +227,252 @@ pub type ReplicationFilter =  fn(document: &Document,
     to the server. */
 pub type ConflictResolver = fn(document_id: &str,
                                local_document: Option<Document>,
-                               remote_document: Option<Document>) -> Document;
+                               remote_document: Option<Document>) -> Option<Document>;
+unsafe extern "C" fn c_replication_conflict_resolver(
+    context: *mut ::std::os::raw::c_void,
+    document_id: FLString,
+    local_document: *const CBLDocument,
+    remote_document: *const CBLDocument,
+) -> *const CBLDocument {
+    let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
 
+    let doc_id = document_id.to_string().unwrap_or("".to_string());
+    let local_document = if local_document.is_null() {
+        Some(Document {
+            _ref: local_document as *mut CBLDocument,
+            has_ownership: false,
+        })
+    } else {
+        None
+    };
+    let remote_document = if remote_document.is_null() {
+        Some(Document {
+            _ref: remote_document as *mut CBLDocument,
+            has_ownership: false,
+        })
+    } else {
+        None
+    };
+
+    if let Some(callback) = repl_conf_context.conflict_resolver {
+        callback(&doc_id, local_document, remote_document)
+            .map(|d| d._ref as *const CBLDocument)
+            .unwrap_or(ptr::null())
+    } else {
+        ptr::null()
+    }
+}
+
+/** Callback that encrypts encryptable properties in documents pushed by the replicator.
+    \note   If a null result or an error is returned, the document will be failed to
+            replicate with the kCBLErrorCrypto error. For security reason, the encryption
+            cannot be skipped. */
+pub type PropertyEncryptor = fn(
+    document_id: Option<String>,
+    properties: Dict,
+    key_path: Option<String>,
+    input: Option<String>,
+    algorithm: Option<String>,
+    kid: Option<String>,
+    error: &Error
+) -> String;
+#[no_mangle]
+pub extern "C" fn c_property_encryptor(
+    context: *mut ::std::os::raw::c_void,
+    document_id: FLString,
+    properties: FLDict,
+    key_path: FLString,
+    input: FLSlice,
+    algorithm: *mut FLStringResult,
+    kid: *mut FLStringResult,
+    cbl_error: *mut CBLError,
+) -> FLSliceResult {
+    unsafe {
+        let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+
+        let error = cbl_error.as_ref().map(|e| Error::new(e)).unwrap_or(Error::default());
+
+        let result = repl_conf_context.property_encryptor
+            .map(|callback| {
+                callback(
+                    document_id.to_string(),
+                    Dict::wrap(properties, &properties),
+                    key_path.to_string(),
+                    input.to_string(),
+                    algorithm.as_ref().and_then(|s| s.to_string()),
+                    kid.as_ref().and_then(|s| s.to_string()),
+                    &error,
+                )
+            })
+            .map(|s| FLSlice_Copy(as_slice(&s)))
+            .unwrap_or(FLSliceResult_New(0));
+
+        cbl_error.as_ref().map(|mut err| err = &error.as_cbl_error());
+        result
+    }
+}
+
+/** Callback that decrypts encrypted encryptable properties in documents pulled by the replicator.
+    \note   The decryption will be skipped (the encrypted data will be kept) when a null result
+            without an error is returned. If an error is returned, the document will be failed to replicate
+            with the kCBLErrorCrypto error. */
+pub type PropertyDecryptor = fn(
+    document_id: Option<String>,
+    properties: Dict,
+    key_path: Option<String>,
+    input: Option<String>,
+    algorithm: Option<String>,
+    kid: Option<String>,
+    error: &Error
+) -> String;
+#[no_mangle]
+pub extern "C" fn c_property_decryptor(
+    context: *mut ::std::os::raw::c_void,
+    document_id: FLString,
+    properties: FLDict,
+    key_path: FLString,
+    input: FLSlice,
+    algorithm: FLString,
+    kid: FLString,
+    cbl_error: *mut CBLError,
+) -> FLSliceResult {
+    unsafe {
+        let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+
+        let error = cbl_error.as_ref().map(|e| Error::new(e)).unwrap_or(Error::default());
+
+        let result = repl_conf_context.property_decryptor
+            .map(|callback| {
+                callback(
+                    document_id.to_string(),
+                    Dict::wrap(properties, &properties),
+                    key_path.to_string(),
+                    input.to_string(),
+                    algorithm.to_string(),
+                    kid.to_string(),
+                    &error,
+                )
+            })
+            .map(|s| FLSlice_Copy(as_slice(&s)))
+            .unwrap_or(FLSliceResult_New(0));
+
+        cbl_error.as_ref().map(|mut err| err = &error.as_cbl_error());
+        result
+    }
+}
+
+
+struct ReplicationConfigurationContext {
+    pub push_filter:               Option<ReplicationFilter>,
+    pub pull_filter:               Option<ReplicationFilter>,
+    pub conflict_resolver:         Option<ConflictResolver>,
+    pub property_encryptor:        Option<PropertyEncryptor>,
+    pub property_decryptor:        Option<PropertyDecryptor>,
+}
 
 /** The configuration of a replicator. */
 pub struct ReplicatorConfiguration<'c> {
-    pub database:                  &'c Database,            // The database to replicate
-    pub endpoint:                  Endpoint<'c>,    // The address of the other database to replicate with
-    pub replicator_type:           ReplicatorType,          // Push, pull or both
-    pub continuous:                bool,                    // Continuous replication?
-    pub authenticator:             Authenticator<'c>,   // Authentication credentials, if needed
-    pub proxy:                     Option<ProxySettings<'c>>,   // HTTP client proxy settings
-    pub headers:                   Option<HashMap<&'c str,&'c str>>, // Extra HTTP headers to add to the WebSocket request
-    pub pinned_server_certificate: Option<Vec<u8>>,         // An X.509 cert to "pin" TLS connections to (PEM or DER)
-    pub trusted_root_certificates: Option<Vec<u8>>,         // Set of anchor certs (PEM format)
-    pub channels:                  Option<Vec<&'c str>>,    // Optional set of channels to pull from
-    pub document_ids:              Option<Vec<&'c str>>,    // Optional set of document IDs to replicate
-    pub push_filter:               ReplicationFilter,       // Optional callback to filter which docs are pushed
-    pub pull_filter:               ReplicationFilter,       // Optional callback to validate incoming docs
-    pub conflict_resolver:         ConflictResolver,        // Optional conflict-resolver callback
+    pub database:                  Database,                     // The database to replicate
+    pub endpoint:                  Endpoint,                     // The address of the other database to replicate with
+    pub replicator_type:           ReplicatorType,                   // Push, pull or both
+    pub continuous:                bool,                             // Continuous replication?
+    //-- Auto Purge:
+    /**
+    If auto purge is active, then the library will automatically purge any documents that the replicating
+    user loses access to via the Sync Function on Sync Gateway.  If disableAutoPurge is true, this behavior
+    is disabled and an access removed event will be sent to any document listeners that are active on the
+    replicator.
+
+    IMPORTANT: For performance reasons, the document listeners must be added *before* the replicator is started
+    or they will not receive the events.
+    */
+    pub disable_auto_purge:        bool,
+    //-- Retry Logic:
+    pub max_attempts:              u32,	                             //< Max retry attempts where the initial connect to replicate counts toward the given value.
+                                                                     //< Specify 0 to use the default value, 10 times for a non-continuous replicator and max-int time for a continuous replicator. Specify 1 means there will be no retry after the first attempt.
+    pub max_attempt_wait_time:     u32,	                             //< Max wait time between retry attempts in seconds. Specify 0 to use the default value of 300 seconds.
+    //-- WebSocket:
+    pub heartbeat:                 u32,                              //< The heartbeat interval in seconds. Specify 0 to use the default value of 300 seconds.
+    pub authenticator:             Option<Authenticator>,                // Authentication credentials, if needed
+    pub proxy:                     Option<ProxySettings>,            // HTTP client proxy settings
+    pub headers:                   Dict<'c>,                     // Extra HTTP headers to add to the WebSocket request
+    //-- TLS settings:
+    pub pinned_server_certificate: Option<Vec<u8>>,                  // An X.509 cert to "pin" TLS connections to (PEM or DER)
+    pub trusted_root_certificates: Option<Vec<u8>>,                  // Set of anchor certs (PEM format)
+    //-- Filtering:
+    pub channels:                  Option<Array<'c>>,             // Optional set of channels to pull from
+    pub document_ids:              Option<Array<'c>>,             // Optional set of document IDs to replicate
+    pub push_filter:               Option<ReplicationFilter>,        // Optional callback to filter which docs are pushed
+    pub pull_filter:               Option<ReplicationFilter>,        // Optional callback to validate incoming docs
+    pub conflict_resolver:         Option<ConflictResolver>,         // Optional conflict-resolver callback
+    pub context:                   *mut ::std::os::raw::c_void,      //< Arbitrary value that will be passed to callbacks
+    //-- Property Encryption
+    pub property_encryptor:        Option<PropertyEncryptor>,	     //< Optional callback to encrypt \ref CBLEncryptable values.
+    pub property_decryptor:        Option<PropertyDecryptor>,        //< Optional callback to decrypt encrypted \ref CBLEncryptable values.
+}
+
+impl<'c> From<CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
+    fn from(config: CBLReplicatorConfiguration) -> Self {
+        let context: ReplicationConfigurationContext = std::mem::transmute(config.context);
+
+        ReplicatorConfiguration {
+            database: Database { _ref: config.database, has_ownership: false },
+            endpoint: Endpoint { _ref: config.endpoint },
+            replicator_type: config.replicatorType.into(),
+            continuous: config.continuous,
+            disable_auto_purge: config.disableAutoPurge,
+            max_attempts: config.maxAttempts,
+            max_attempt_wait_time: config.maxAttemptWaitTime,
+            heartbeat: config.heartbeat,
+            authenticator: if config.authenticator.is_null() { None } else { Some(Authenticator { _ref: config.authenticator }) },
+            proxy: config.proxy.as_ref().map(|proxy| proxy.into()),//if config.proxy.is_null() { None } else { Some(config.proxy.into()) },
+            headers: Dict::wrap(config.headers, &config.headers),
+            pinned_server_certificate: config.pinnedServerCertificate.as_byte_array(),
+            trusted_root_certificates: config.trustedRootCertificates.as_byte_array(),
+            channels: Array { _ref: config.channels, _owner: config.channels },
+            document_ids: Array { _ref: config.documentIDs, _owner: config.documentIDs },
+            push_filter: context.push_filter,
+            pull_filter: context.pull_filter,
+            conflict_resolver: context.conflict_resolver,
+            property_encryptor: context.property_encryptor,
+            property_decryptor: context.property_encryptor,
+        }
+    }
+}
+impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
+    fn from(config: ReplicatorConfiguration<'c>) -> Self {
+        let context = ReplicationConfigurationContext {
+            push_filter: config.push_filter,
+            pull_filter: config.pull_filter,
+            conflict_resolver: config.conflict_resolver,
+            property_encryptor: config.property_encryptor,
+            property_decryptor: config.property_decryptor,
+        };
+
+        CBLReplicatorConfiguration {
+            database: config.database._ref,
+            endpoint: config.endpoint._ref,
+            replicatorType: config.replicator_type.into(),
+            continuous: config.continuous,
+            disableAutoPurge: config.disableAutoPurge,
+            maxAttempts: config.max_attempts,
+            maxAttemptWaitTime: config.max_attempt_wait_time,
+            heartbeat: config.heartbeat,
+            authenticator: config.authenticator.map(|a| a._ref).unwrap_or(ptr::null_mut()),
+            proxy: config.proxy.map(|p| p.into()).or(ptr::null()),
+            headers: config.headers._ref,
+            pinnedServerCertificate: config.pinned_server_certificate.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
+            trustedRootCertificates: config.trusted_root_certificates.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
+            channels: config.channels._ref,
+            documentIDs: config.document_ids._ref,
+            pushFilter: if context.push_filter.is_some() { c_replication_push_filter } else { None },
+            pullFilter: if context.pull_filter.is_some() { c_replication_pull_filter } else { None },
+            conflictResolver: if context.conflict_resolver.is_some() { c_replication_conflict_resolver } else { None },
+            context: std::mem::transmute(context),
+            propertyEncryptor: if context.push_filter.is_some() { c_property_encryptor } else { None },
+            propertyDecryptor: if context.push_filter.is_some() { c_property_decryptor } else { None },
+        }
+    }
 }
 
 
@@ -107,13 +486,25 @@ pub struct Replicator {
 
 impl Replicator {
     /** Creates a replicator with the given configuration. */
-    pub fn new(_config: ReplicatorConfiguration) -> Result<Replicator> {
-        todo!()
+    pub fn new(config: ReplicatorConfiguration) -> Result<Replicator> {
+        unsafe {
+            let mut error = CBLError::default();
+            let replicator = CBLReplicator_Create(config.into(), &mut error as *mut CBLError);
+
+            check_error(&error).and_then(|()| {
+                Ok(Replicator {
+                    _ref: replicator,
+                    has_ownership: true,
+                })
+            })
+        }
     }
 
     /** Returns the configuration of an existing replicator. */
     pub fn config(&self) -> ReplicatorConfiguration {
-        todo!()
+        unsafe {
+            CBLReplicator_Config(self._ref).into()
+        }
     }
 
     /** Starts a replicator, asynchronously. Does nothing if it's already started. */

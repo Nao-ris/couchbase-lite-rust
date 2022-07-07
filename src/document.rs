@@ -22,7 +22,8 @@ use super::c_api::*;
 
 /** An in-memory copy of a document. */
 pub struct Document {
-    _ref: *mut CBLDocument
+    pub _ref: *mut CBLDocument,
+    pub has_ownership: bool,
 }
 
 
@@ -57,7 +58,10 @@ impl Database {
                     return Err(Error::cbl_error(CouchbaseLiteError::NotFound));
                 }
             }
-            return Ok(Document{_ref: doc});
+            return Ok(Document{
+                _ref: doc,
+                has_ownership: true,
+            });
         }
     }
 
@@ -140,13 +144,23 @@ impl Document {
     /** Creates a new, empty document in memory, with an automatically generated unique ID.
         It will not be added to a database until saved. */
     pub fn new() -> Self {
-        unsafe { Document{_ref: CBLDocument_Create()} }
+        unsafe {
+            Document{
+                _ref: CBLDocument_Create(),
+                has_ownership: true,
+            }
+        }
     }
 
     /** Creates a new, empty document in memory, with the given ID.
         It will not be added to a database until saved. */
     pub fn new_with_id(id: &str) -> Self {
-        unsafe { Document{_ref: CBLDocument_CreateWithID(as_slice(id))} }
+        unsafe {
+            Document{
+                _ref: CBLDocument_CreateWithID(as_slice(id)),
+                has_ownership: true,
+            }
+        }
     }
 
     /** Deletes a document from the database. (Deletions are replicated, unlike purges.) */
@@ -220,13 +234,21 @@ impl Document {
 
 impl Drop for Document {
     fn drop(&mut self) {
-        unsafe { release(self._ref); }
+        unsafe {
+            if self.has_ownership {
+                release(self._ref);
+            }
+        }
     }
 }
 
 
-impl Clone for Document {
+/*impl Clone for Document {
     fn clone(&self) -> Self {
-        unsafe { Document{_ref: retain(self._ref)} }
+        unsafe {
+            Document{
+                _ref: retain(self._ref)
+            }
+        }
     }
-}
+}*/
