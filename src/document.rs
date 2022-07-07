@@ -149,18 +149,6 @@ impl Document {
         unsafe { Document{_ref: CBLDocument_CreateWithID(as_slice(id))} }
     }
 
-    /** Deletes a document from the database. (Deletions are replicated, unlike purges.) */
-    pub fn delete(self) -> Result<()> {
-        todo!()
-    }
-
-    /** Purges a document. This removes all traces of the document from the database.
-        Purges are _not_ replicated. If the document is changed on a server, it will be re-created
-        when pulled. */
-    pub fn purge(self) -> Result<()> {
-        todo!()
-    }
-
     /** Returns the document's ID. */
     pub fn id(&self) -> &str {
         unsafe { CBLDocument_ID(self._ref).as_str().unwrap() }
