@@ -410,8 +410,8 @@ pub struct ReplicatorConfiguration<'c> {
     pub property_decryptor:        Option<PropertyDecryptor>,        //< Optional callback to decrypt encrypted \ref CBLEncryptable values.
 }
 
-impl<'c> From<CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
-    fn from(config: CBLReplicatorConfiguration) -> Self {
+impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
+    fn from(config: &'c CBLReplicatorConfiguration) -> Self {
         let context: ReplicationConfigurationContext = std::mem::transmute(config.context);
 
         ReplicatorConfiguration {
@@ -448,6 +448,11 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
             property_decryptor: config.property_decryptor,
         };
 
+        let proxy = config.proxy
+            .map(|p| Box::new(p.into()))
+            .map(|b| Box::into_raw(b))
+            .unwrap_or(ptr::null_mut());
+
         CBLReplicatorConfiguration {
             database: config.database._ref,
             endpoint: config.endpoint._ref,
@@ -458,7 +463,7 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
             maxAttemptWaitTime: config.max_attempt_wait_time,
             heartbeat: config.heartbeat,
             authenticator: config.authenticator.map(|a| a._ref).unwrap_or(ptr::null_mut()),
-            proxy: config.proxy.map(|p| p.into()).unwrap_or(ptr::null()),
+            proxy: proxy,
             headers: config.headers._ref,
             pinnedServerCertificate: config.pinned_server_certificate.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
             trustedRootCertificates: config.trusted_root_certificates.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
@@ -487,8 +492,11 @@ impl Replicator {
     /** Creates a replicator with the given configuration. */
     pub fn new(config: ReplicatorConfiguration) -> Result<Replicator> {
         unsafe {
+            let cbl_config: Box<CBLReplicatorConfiguration> = Box::new(config.into());
+            let cbl_config = Box::into_raw(cbl_config);
+
             let mut error = CBLError::default();
-            let replicator = CBLReplicator_Create(config.into(), &mut error as *mut CBLError);
+            let replicator = CBLReplicator_Create(cbl_config, &mut error as *mut CBLError);
 
             check_error(&error).and_then(|()| {
                 Ok(Replicator {
@@ -500,9 +508,10 @@ impl Replicator {
     }
 
     /** Returns the configuration of an existing replicator. */
-    pub fn config(&self) -> ReplicatorConfiguration {
+    pub fn config(&self) -> Option<ReplicatorConfiguration> {
         unsafe {
-            CBLReplicator_Config(self._ref).into()
+            let cbl_config = CBLReplicator_Config(self._ref);
+            cbl_config.as_ref().map(|c| c.into())
         }
     }
 
