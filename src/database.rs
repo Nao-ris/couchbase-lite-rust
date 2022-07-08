@@ -52,10 +52,7 @@ unsafe extern "C" fn c_database_change_listener(
 ) {
     let callback: ChangeListener = std::mem::transmute(context);
 
-    let database = Database {
-        _ref: db as *mut CBLDatabase,
-        has_ownership: false,
-    };
+    let database = Database { _ref: db as *mut CBLDatabase };
 
     let doc_ids = std::slice::from_raw_parts(c_doc_ids, num_docs as usize)
         .iter()
@@ -73,18 +70,15 @@ unsafe extern "C" fn c_database_buffer_notifications(
 ) {
     let callback: BufferNotifications = std::mem::transmute(context);
 
-    let database = Database {
-        _ref: db as *mut CBLDatabase,
-        has_ownership: false,
-    };
+    let database = Database { _ref: db as *mut CBLDatabase };
 
     callback(&database);
 }
 
 /** A connection to an open database. */
+#[derive(Debug, PartialEq, Eq)]
 pub struct Database {
     pub(crate) _ref: *mut CBLDatabase,
-    pub(crate) has_ownership: bool,
 }
 
 impl Database {
@@ -118,10 +112,7 @@ impl Database {
         if db_ref.is_null() {
             return failure(err);
         }
-        return Ok(Database{
-            _ref: db_ref,
-            has_ownership: true,
-        });
+        return Ok(Database{ _ref: db_ref });
     }
 
 
@@ -262,9 +253,17 @@ impl Database {
 
 impl Drop for Database {
     fn drop(&mut self) {
-        if self.has_ownership {
-            unsafe {
-                release(self._ref)
+        unsafe {
+            release(self._ref)
+        }
+    }
+}
+
+impl Clone for Database {
+    fn clone(&self) -> Self {
+        unsafe {
+            return Database {
+                _ref: retain(self._ref)
             }
         }
     }

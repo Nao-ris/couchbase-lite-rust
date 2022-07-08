@@ -32,28 +32,32 @@ use super::c_api::*;
 
 
 /** Represents the location of a database to replicate with. */
+#[derive(Debug, PartialEq, Eq)]
 pub struct Endpoint {
-    pub _ref: *mut CBLEndpoint
+    pub _ref: *mut CBLEndpoint,
+    has_ownership: bool,
 }
 
 impl Endpoint {
-    pub fn new_with_url(url: String) -> Result<Self> {
+    pub fn new_with_url(url: String, owner: bool) -> Result<Self> {
         unsafe {
             let mut error = CBLError::default();
             let endpoint: *mut CBLEndpoint = CBLEndpoint_CreateWithURL(as_slice(&url), &mut error as *mut CBLError);
 
             check_error(&error).and_then(|()| {
                 Ok(Self {
-                    _ref: endpoint
+                    _ref: endpoint,
+                    has_ownership: owner,
                 })
             })
         }
     }
 
-    pub fn new_with_local_db(db: &Database) -> Self {
+    pub fn new_with_local_db(db: &Database, owner: bool) -> Self {
         unsafe {
             Self {
-                _ref: CBLEndpoint_CreateWithLocalDB(db._ref)
+                _ref: CBLEndpoint_CreateWithLocalDB(db._ref),
+                has_ownership: owner,
             }
         }
     }
@@ -62,29 +66,34 @@ impl Endpoint {
 impl Drop for Endpoint {
     fn drop(&mut self) {
         unsafe {
-            CBLEndpoint_Free(self._ref);
+            if self.has_ownership {
+                CBLEndpoint_Free(self._ref);
+            }
         }
     }
 }
 
-
+#[derive(Debug, PartialEq, Eq)]
 pub struct Authenticator {
-    _ref: *mut CBLAuthenticator
+    _ref: *mut CBLAuthenticator,
+    has_ownership: bool,
 }
 
 impl Authenticator {
-    pub fn create_password(username: String, password: String) -> Self {
+    pub fn create_password(username: String, password: String, owner: bool) -> Self {
         unsafe {
             Self {
-                _ref: CBLAuth_CreatePassword(as_slice(&username), as_slice(&password))
+                _ref: CBLAuth_CreatePassword(as_slice(&username), as_slice(&password)),
+                has_ownership: owner,
             }
         }
     }
 
-    pub fn create_session(session_id: String, cookie_name: String) -> Self {
+    pub fn create_session(session_id: String, cookie_name: String, owner: bool) -> Self {
         unsafe {
             Self {
-                _ref: CBLAuth_CreateSession(as_slice(&session_id), as_slice(&cookie_name))
+                _ref: CBLAuth_CreateSession(as_slice(&session_id), as_slice(&cookie_name)),
+                has_ownership: owner,
             }
         }
     }
@@ -93,14 +102,16 @@ impl Authenticator {
 impl Drop for Authenticator {
     fn drop(&mut self) {
         unsafe {
-            CBLAuth_Free(self._ref);
+            if self.has_ownership {
+                CBLAuth_Free(self._ref);
+            }
         }
     }
 }
 
 
 /** Direction of replication: push, pull, or both. */
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ReplicatorType { PushAndPull, Push, Pull }
 
 impl From<CBLReplicatorType> for ReplicatorType {
@@ -124,7 +135,7 @@ impl From<ReplicatorType> for CBLReplicatorType {
 }
 
 /** Types of proxy servers, for CBLProxySettings. */
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ProxyType { HTTP, HTTPS }
 
 impl From<CBLProxyType> for ProxyType {
@@ -146,6 +157,7 @@ impl From<ProxyType> for CBLProxyType {
 }
 
 /** Proxy settings for the replicator. */
+#[derive(Debug, PartialEq, Eq)]
 pub struct ProxySettings {
     pub proxy_type: ProxyType,          // Type of proxy
     pub hostname:   Option<String>,            // Proxy server hostname or IP address
@@ -169,10 +181,10 @@ impl From<ProxySettings> for CBLProxySettings {
     fn from(proxy_settings: ProxySettings) -> Self {
         CBLProxySettings {
             type_: proxy_settings.proxy_type.into(),
-            hostname: proxy_settings.hostname.map(|s| as_slice(&s)).unwrap_or(slice::NULL_SLICE),
+            hostname: proxy_settings.hostname.map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() }).unwrap_or(slice::NULL_SLICE),
             port: proxy_settings.port,
-            username: proxy_settings.username.map(|s| as_slice(&s)).unwrap_or(slice::NULL_SLICE),
-            password: proxy_settings.password.map(|s| as_slice(&s)).unwrap_or(slice::NULL_SLICE),
+            username: proxy_settings.username.map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() }).unwrap_or(slice::NULL_SLICE),
+            password: proxy_settings.password.map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() }).unwrap_or(slice::NULL_SLICE),
         }
     }
 }
@@ -420,15 +432,25 @@ impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
             let context: *const ReplicationConfigurationContext = std::mem::transmute(config.context);
 
             ReplicatorConfiguration {
-                database: Database { _ref: config.database, has_ownership: false },
-                endpoint: Endpoint { _ref: config.endpoint },
+                database: Database { _ref: config.database },
+                endpoint: Endpoint {
+                    _ref: config.endpoint,
+                    has_ownership: false,
+                },
                 replicator_type: config.replicatorType.into(),
                 continuous: config.continuous,
                 disable_auto_purge: config.disableAutoPurge,
                 max_attempts: config.maxAttempts,
                 max_attempt_wait_time: config.maxAttemptWaitTime,
                 heartbeat: config.heartbeat,
-                authenticator: if config.authenticator.is_null() { None } else { Some(Authenticator { _ref: config.authenticator }) },
+                authenticator: if config.authenticator.is_null() {
+                    None
+                } else {
+                    Some(Authenticator {
+                        _ref: config.authenticator,
+                        has_ownership: false,
+                    })
+                },
                 proxy: config.proxy.as_ref().map(|proxy| proxy.into()),
                 headers: Dict::wrap(config.headers, &config.headers),
                 pinned_server_certificate: config.pinnedServerCertificate.as_byte_array(),
@@ -461,7 +483,7 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
             .unwrap_or(ptr::null_mut());
         unsafe {
             CBLReplicatorConfiguration {
-                database: config.database._ref,
+                database: retain(config.database._ref),
                 endpoint: config.endpoint._ref,
                 replicatorType: config.replicator_type.into(),
                 continuous: config.continuous,
@@ -567,10 +589,6 @@ impl Drop for Replicator {
     fn drop(&mut self) {
         unsafe {
             if self.has_ownership {
-                let cbl_config = CBLReplicator_Config(self._ref);
-                let repl_conf_context: *mut ReplicationConfigurationContext = std::mem::transmute((*cbl_config).context);
-                release(repl_conf_context);
-
                 CBL_Release(self._ref as *mut CBLRefCounted)
             }
         }
