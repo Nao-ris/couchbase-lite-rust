@@ -1,10 +1,14 @@
 
 extern crate couchbase_lite;
 extern crate core;
+extern crate lazy_static;
 
+use lazy_static::lazy_static;
 use self::couchbase_lite::*;
 
 pub mod utils;
+
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn document_new() {
@@ -100,19 +104,6 @@ fn database_get_document() {
 }
 
 #[test]
-fn database_get_document_multiple_dbs() {
-    utils::with_db(|db| {
-        let mut document = Document::new_with_id("foo");
-        db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
-        utils::with_db(|db| {
-            let document = db.get_document(document.id());
-            assert!(document.is_ok());
-            assert_eq!(document.unwrap().id(), "foo");
-        });
-    });
-}
-
-#[test]
 fn database_save_document() {
     utils::with_db(|db| {
         let mut document = Document::new_with_id("foo");
@@ -127,29 +118,6 @@ fn database_save_document() {
         let conflict_error = db.save_document(&mut document, ConcurrencyControl::FailOnConflict);
         assert!(conflict_error.is_err());
         db.save_document(&mut document, ConcurrencyControl::LastWriteWins).expect("save_document");
-        let document = db.get_document("foo").expect("get_document");
-        assert_eq!(document.properties().get("foo").as_i64_or_0(), 2);
-    });
-}
-
-#[test]
-fn database_save_document_multiple_dbs() {
-    utils::with_db(|db| {
-        let mut document = Document::new_with_id("foo");
-        db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
-        utils::with_db(|db| {
-            let mut document = db.get_document("foo").expect("get_document");
-            document.mutable_properties().at("foo").put_i64(1);
-            db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
-        });
-        document.mutable_properties().at("foo").put_i64(2);
-        utils::with_db(|db| {
-            let conflict_error = db.save_document(&mut document, ConcurrencyControl::FailOnConflict);
-            assert!(conflict_error.is_err());
-        });
-        utils::with_db(|db| {
-            db.save_document(&mut document, ConcurrencyControl::LastWriteWins).expect("save_document");
-        });
         let document = db.get_document("foo").expect("get_document");
         assert_eq!(document.properties().get("foo").as_i64_or_0(), 2);
     });
@@ -179,31 +147,13 @@ fn database_save_document_resolving() {
 }
 
 #[test]
-fn database_save_document_resolving_multiple_dbs() {
+fn database_delete_document() {
     utils::with_db(|db| {
         let mut document = Document::new_with_id("foo");
         db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
-        utils::with_db(|db| {
-            let mut document = db.get_document("foo").unwrap();
-            document.mutable_properties().at("foo").put_i64(1);
-            db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
-        });
-        document.mutable_properties().at("foo").put_i64(2);
-        document = db.save_document_resolving(&mut document, |document_a, document_b| {
-            let property_a = document_a.properties().get("foo").as_i64_or_0();
-            let property_b = document_b.properties().get("foo").as_i64_or_0();
-            document_a.mutable_properties().at("foo").put_i64(property_a + property_b);
-            true
-        }).expect("save_document_resolving");
-        assert_eq!(document.properties().get("foo").as_i64_or_0(), 3);
-        document = db.get_document("foo").unwrap();
-        assert_eq!(document.properties().get("foo").as_i64_or_0(), 3);
-    });
-}
-
-#[test]
-fn database_delete_document() {
-    utils::with_db(|_db| {
+        db.delete_document(&document, ConcurrencyControl::FailOnConflict).expect("delete_document");
+        let document = db.get_document("foo");
+        assert!(document.is_err());
     });
 }
 
@@ -236,5 +186,28 @@ fn database_document_expiration() {
         let expiration = db.document_expiration("foo").expect("document_expiration");
         assert!(expiration.is_some());
         assert_eq!(expiration.unwrap().0, 1000000000);
+    });
+}
+
+lazy_static! {
+    static ref DOCUMENT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+}
+
+#[test]
+fn database_add_document_change_listener() {
+    utils::set_static(&DOCUMENT_DETECTED, false);
+
+    utils::with_db(|db| {
+        let mut document = Document::new_with_id("foo");
+        db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
+        let listener_token = db.add_document_change_listener(&document, |_, document_id| {
+            if document_id == "foo" {
+                utils::set_static(&DOCUMENT_DETECTED, true);
+            }
+        });
+        document.mutable_properties().at("foo").put_i64(1);
+        db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
+        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED));
+        drop(listener_token);
     });
 }

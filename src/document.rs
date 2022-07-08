@@ -49,6 +49,21 @@ unsafe extern "C" fn c_save_conflict_handler(
 }
 
 pub type ChangeListener = fn(&Database, &str);
+#[no_mangle]
+unsafe extern "C" fn c_document_change_listener(
+    context: *mut ::std::os::raw::c_void,
+    db: *const CBLDatabase,
+    c_doc_id: FLString,
+) {
+    let callback: ChangeListener = std::mem::transmute(context);
+
+    let database = Database {
+        _ref: db as *mut CBLDatabase,
+        has_ownership: false,
+    };
+
+    callback(&database, c_doc_id.to_string().unwrap().as_ref());
+}
 
 impl Database {
     /** Reads a document from the database. Each call to this function returns a new object
@@ -154,8 +169,14 @@ impl Database {
 
     /** Registers a document change listener callback. It will be called after a specific document
         is changed on disk. */
-    pub fn add_document_change_listener(&self, _doc_id: &str, _listener: ChangeListener) -> ListenerToken {
-        todo!()
+    pub fn add_document_change_listener(&self, document: &Document, listener: ChangeListener) -> ListenerToken {
+        unsafe {
+            let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
+
+            ListenerToken {
+                _ref: CBLDatabase_AddDocumentChangeListener(self._ref, CBLDocument_ID(document._ref), Some(c_document_change_listener), callback)
+            }
+        }
     }
 
 }

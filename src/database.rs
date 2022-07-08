@@ -87,7 +87,7 @@ unsafe extern "C" fn c_buffer_notifications(
 /** A connection to an open database. */
 pub struct Database {
     pub(crate) _ref: *mut CBLDatabase,
-    has_ownership: bool,
+    pub(crate) has_ownership: bool,
 }
 
 impl Database {
