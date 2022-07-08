@@ -158,10 +158,10 @@ impl From<&CBLProxySettings> for ProxySettings {
     fn from(proxy_settings: &CBLProxySettings) -> Self {
         ProxySettings {
             proxy_type: proxy_settings.type_.into(),
-            hostname: proxy_settings.hostname.to_string(),
+            hostname: unsafe { proxy_settings.hostname.to_string() },
             port: proxy_settings.port,
-            username: proxy_settings.username.to_string(),
-            password: proxy_settings.password.to_string(),
+            username: unsafe { proxy_settings.username.to_string() },
+            password: unsafe { proxy_settings.password.to_string() },
         }
     }
 }
@@ -186,7 +186,7 @@ unsafe extern "C" fn c_replication_push_filter(
     document: *mut CBLDocument,
     flags: CBLDocumentFlags,
 ) -> bool {
-    let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+    let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
     let document = Document {
         _ref: document as *mut CBLDocument,
@@ -195,7 +195,7 @@ unsafe extern "C" fn c_replication_push_filter(
 
     let (is_deleted, is_access_removed) = read_document_flags(flags);
 
-    repl_conf_context.push_filter
+    (*repl_conf_context).push_filter
         .map(|callback| callback(&document, is_deleted, is_access_removed))
         .unwrap_or(false)
 }
@@ -204,7 +204,7 @@ unsafe extern "C" fn c_replication_pull_filter(
     document: *mut CBLDocument,
     flags: CBLDocumentFlags,
 ) -> bool {
-    let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+    let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
     let document = Document {
         _ref: document as *mut CBLDocument,
@@ -213,7 +213,7 @@ unsafe extern "C" fn c_replication_pull_filter(
 
     let (is_deleted, is_access_removed) = read_document_flags(flags);
 
-    repl_conf_context.pull_filter
+    (*repl_conf_context).pull_filter
         .map(|callback| callback(&document, is_deleted, is_access_removed))
         .unwrap_or(false)
 }
@@ -234,7 +234,7 @@ unsafe extern "C" fn c_replication_conflict_resolver(
     local_document: *const CBLDocument,
     remote_document: *const CBLDocument,
 ) -> *const CBLDocument {
-    let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+    let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
     let doc_id = document_id.to_string().unwrap_or("".to_string());
     let local_document = if local_document.is_null() {
@@ -254,7 +254,7 @@ unsafe extern "C" fn c_replication_conflict_resolver(
         None
     };
 
-    if let Some(callback) = repl_conf_context.conflict_resolver {
+    if let Some(callback) = (*repl_conf_context).conflict_resolver {
         callback(&doc_id, local_document, remote_document)
             .map(|d| d._ref as *const CBLDocument)
             .unwrap_or(ptr::null())
@@ -288,11 +288,11 @@ pub extern "C" fn c_property_encryptor(
     cbl_error: *mut CBLError,
 ) -> FLSliceResult {
     unsafe {
-        let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+        let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
         let error = cbl_error.as_ref().map(|e| Error::new(e)).unwrap_or(Error::default());
 
-        let result = repl_conf_context.property_encryptor
+        let result = (*repl_conf_context).property_encryptor
             .map(|callback| {
                 callback(
                     document_id.to_string(),
@@ -307,7 +307,9 @@ pub extern "C" fn c_property_encryptor(
             .map(|s| FLSlice_Copy(as_slice(&s)))
             .unwrap_or(FLSliceResult_New(0));
 
-        cbl_error.as_ref().map(|mut err| err = &error.as_cbl_error());
+        if !cbl_error.is_null() {
+            *cbl_error = error.as_cbl_error();
+        }
         result
     }
 }
@@ -337,11 +339,11 @@ pub extern "C" fn c_property_decryptor(
     cbl_error: *mut CBLError,
 ) -> FLSliceResult {
     unsafe {
-        let repl_conf_context: ReplicationConfigurationContext = std::mem::transmute(context);
+        let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
         let error = cbl_error.as_ref().map(|e| Error::new(e)).unwrap_or(Error::default());
 
-        let result = repl_conf_context.property_decryptor
+        let result = (*repl_conf_context).property_decryptor
             .map(|callback| {
                 callback(
                     document_id.to_string(),
@@ -356,7 +358,9 @@ pub extern "C" fn c_property_decryptor(
             .map(|s| FLSlice_Copy(as_slice(&s)))
             .unwrap_or(FLSliceResult_New(0));
 
-        cbl_error.as_ref().map(|mut err| err = &error.as_cbl_error());
+        if !cbl_error.is_null() {
+            *cbl_error = error.as_cbl_error();
+        }
         result
     }
 }
@@ -412,69 +416,73 @@ pub struct ReplicatorConfiguration<'c> {
 
 impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
     fn from(config: &'c CBLReplicatorConfiguration) -> Self {
-        let context: ReplicationConfigurationContext = std::mem::transmute(config.context);
+        unsafe {
+            let context: *const ReplicationConfigurationContext = std::mem::transmute(config.context);
 
-        ReplicatorConfiguration {
-            database: Database { _ref: config.database, has_ownership: false },
-            endpoint: Endpoint { _ref: config.endpoint },
-            replicator_type: config.replicatorType.into(),
-            continuous: config.continuous,
-            disable_auto_purge: config.disableAutoPurge,
-            max_attempts: config.maxAttempts,
-            max_attempt_wait_time: config.maxAttemptWaitTime,
-            heartbeat: config.heartbeat,
-            authenticator: if config.authenticator.is_null() { None } else { Some(Authenticator { _ref: config.authenticator }) },
-            proxy: config.proxy.as_ref().map(|proxy| proxy.into()),
-            headers: Dict::wrap(config.headers, &config.headers),
-            pinned_server_certificate: config.pinnedServerCertificate.as_byte_array(),
-            trusted_root_certificates: config.trustedRootCertificates.as_byte_array(),
-            channels: Array::wrap(config.channels, &config.channels),
-            document_ids: Array::wrap(config.documentIDs, &config.documentIDs),
-            push_filter: context.push_filter,
-            pull_filter: context.pull_filter,
-            conflict_resolver: context.conflict_resolver,
-            property_encryptor: context.property_encryptor,
-            property_decryptor: context.property_encryptor,
+            ReplicatorConfiguration {
+                database: Database { _ref: config.database, has_ownership: false },
+                endpoint: Endpoint { _ref: config.endpoint },
+                replicator_type: config.replicatorType.into(),
+                continuous: config.continuous,
+                disable_auto_purge: config.disableAutoPurge,
+                max_attempts: config.maxAttempts,
+                max_attempt_wait_time: config.maxAttemptWaitTime,
+                heartbeat: config.heartbeat,
+                authenticator: if config.authenticator.is_null() { None } else { Some(Authenticator { _ref: config.authenticator }) },
+                proxy: config.proxy.as_ref().map(|proxy| proxy.into()),
+                headers: Dict::wrap(config.headers, &config.headers),
+                pinned_server_certificate: config.pinnedServerCertificate.as_byte_array(),
+                trusted_root_certificates: config.trustedRootCertificates.as_byte_array(),
+                channels: Array::wrap(config.channels, &config.channels),
+                document_ids: Array::wrap(config.documentIDs, &config.documentIDs),
+                push_filter: (*context).push_filter,
+                pull_filter: (*context).pull_filter,
+                conflict_resolver: (*context).conflict_resolver,
+                property_encryptor: (*context).property_encryptor,
+                property_decryptor: (*context).property_encryptor,
+            }
         }
     }
 }
 impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
     fn from(config: ReplicatorConfiguration<'c>) -> Self {
-        let context = ReplicationConfigurationContext {
+        let context: Box<ReplicationConfigurationContext> = Box::new(ReplicationConfigurationContext {
             push_filter: config.push_filter,
             pull_filter: config.pull_filter,
             conflict_resolver: config.conflict_resolver,
             property_encryptor: config.property_encryptor,
             property_decryptor: config.property_decryptor,
-        };
+        });
+        let context = Box::into_raw(context);
 
         let proxy = config.proxy
             .map(|p| Box::new(p.into()))
             .map(|b| Box::into_raw(b))
             .unwrap_or(ptr::null_mut());
-
-        CBLReplicatorConfiguration {
-            database: config.database._ref,
-            endpoint: config.endpoint._ref,
-            replicatorType: config.replicator_type.into(),
-            continuous: config.continuous,
-            disableAutoPurge: config.disable_auto_purge,
-            maxAttempts: config.max_attempts,
-            maxAttemptWaitTime: config.max_attempt_wait_time,
-            heartbeat: config.heartbeat,
-            authenticator: config.authenticator.map(|a| a._ref).unwrap_or(ptr::null_mut()),
-            proxy: proxy,
-            headers: config.headers._ref,
-            pinnedServerCertificate: config.pinned_server_certificate.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
-            trustedRootCertificates: config.trusted_root_certificates.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
-            channels: config.channels._ref,
-            documentIDs: config.document_ids._ref,
-            pushFilter: context.push_filter.and(Some(c_replication_push_filter)),
-            pullFilter: context.pull_filter.and(Some(c_replication_pull_filter)),
-            conflictResolver: context.conflict_resolver.and(Some(c_replication_conflict_resolver)),
-            context: std::mem::transmute(context),
-            propertyEncryptor: context.push_filter.and(Some(c_property_encryptor)),
-            propertyDecryptor: context.push_filter.and(Some(c_property_decryptor)),
+        unsafe {
+            CBLReplicatorConfiguration {
+                database: config.database._ref,
+                endpoint: config.endpoint._ref,
+                replicatorType: config.replicator_type.into(),
+                continuous: config.continuous,
+                disableAutoPurge: config.disable_auto_purge,
+                maxAttempts: config.max_attempts,
+                maxAttemptWaitTime: config.max_attempt_wait_time,
+                heartbeat: config.heartbeat,
+                authenticator: config.authenticator.map(|a| a._ref).unwrap_or(ptr::null_mut()),
+                proxy: proxy,
+                headers: config.headers._ref,
+                pinnedServerCertificate: config.pinned_server_certificate.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
+                trustedRootCertificates: config.trusted_root_certificates.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
+                channels: config.channels._ref,
+                documentIDs: config.document_ids._ref,
+                pushFilter: (*context).push_filter.and(Some(c_replication_push_filter)),
+                pullFilter: (*context).pull_filter.and(Some(c_replication_pull_filter)),
+                conflictResolver: (*context).conflict_resolver.and(Some(c_replication_conflict_resolver)),
+                context: std::mem::transmute(context),
+                propertyEncryptor: (*context).push_filter.and(Some(c_property_encryptor)),
+                propertyDecryptor: (*context).push_filter.and(Some(c_property_decryptor)),
+            }
         }
     }
 }
@@ -559,6 +567,10 @@ impl Drop for Replicator {
     fn drop(&mut self) {
         unsafe {
             if self.has_ownership {
+                let cbl_config = CBLReplicator_Config(self._ref);
+                let repl_conf_context: *mut ReplicationConfigurationContext = std::mem::transmute((*cbl_config).context);
+                release(repl_conf_context);
+
                 CBL_Release(self._ref as *mut CBLRefCounted)
             }
         }
