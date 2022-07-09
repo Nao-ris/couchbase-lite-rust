@@ -23,10 +23,7 @@ use lazy_static::lazy_static;
 
 pub mod utils;
 
-use std::{
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 //////// TESTS:
 
@@ -40,35 +37,27 @@ fn db_properties() {
 
 #[test]
 fn in_transaction() {
-    let path = Path::new("db");
-    let (db_thread, db_exec) = utils::run_db_thread(path);
+    utils::with_db(|db| {
+        let result = db.in_transaction(|db| {
+            let mut doc = Document::new_with_id("document");
+            db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+            Ok("document".to_string())
+        });
 
-    db_exec.spawn(move |db| {
-        if let Some(db) = db.as_mut() {
-            let result = db.in_transaction(|db| {
-                let mut doc = Document::new_with_id("document");
-                db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
-                Ok("document".to_string())
-            });
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "document");
 
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), "document");
+        let result = db.in_transaction(|db| -> Result<String> {
+            let mut doc = Document::new_with_id("document_error");
+            db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+            Err(couchbase_lite::Error::default())
+        });
 
-            let result = db.in_transaction(|db| -> Result<String> {
-                let mut doc = Document::new_with_id("document_error");
-                db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
-                Err(couchbase_lite::Error::default())
-            });
+        assert!(result.is_err());
 
-            assert!(result.is_err());
-
-            assert!(db.get_document("document").is_ok());
-            assert!(db.get_document("document_error").is_err());
-        }
+        assert!(db.get_document("document").is_ok());
+        assert!(db.get_document("document_error").is_err());
     });
-
-    utils::close_db(db_thread, db_exec);
-    utils::delete_db(path);
 }
 
 lazy_static! {
@@ -80,31 +69,20 @@ lazy_static! {
 fn add_listener() {
     utils::set_static(&DOCUMENT_DETECTED, false);
 
-    let path = Path::new("db");
+    utils::with_db(|db| {
+        let listener_token = db.add_listener(| _, doc_ids| {
+            if doc_ids.first().unwrap() == "document" {
+                utils::set_static(&DOCUMENT_DETECTED, true);
+            }
+        });
 
-    let (db_thread, db_exec) = utils::run_db_thread(path);
+        let mut doc = Document::new_with_id("document");
+        db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
 
-    db_exec.spawn(move |db| {
-        if let Some(db) = db.as_mut() {
-            let listener_token = db.add_listener(| _, doc_ids| {
-                if doc_ids.first().unwrap() == "document" {
-                    utils::set_static(&DOCUMENT_DETECTED, true);
-                }
-            });
+        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED));
 
-            let mut doc = Document::new_with_id("document");
-            db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
-
-            assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED));
-
-            drop(listener_token);
-        } else {
-            println!("Error: DB is NOT open");
-        }
+        drop(listener_token);
     });
-
-    utils::close_db(db_thread, db_exec);
-    utils::delete_db(path);
 }
 
 #[test]
@@ -112,40 +90,29 @@ fn buffer_notifications() {
     utils::set_static(&BUFFER_NOTIFICATIONS, false);
     utils::set_static(&DOCUMENT_DETECTED, false);
 
-    let path = Path::new("db");
+    utils::with_db(|db| {
+        db.buffer_notifications(|_| {
+            utils::set_static(&BUFFER_NOTIFICATIONS, true);
+        });
 
-    let (db_thread, db_exec) = utils::run_db_thread(path);
+        let listener_token = db.add_listener(| _, doc_ids| {
+            if doc_ids.first().unwrap() == "document" {
+                utils::set_static(&DOCUMENT_DETECTED, true);
+            }
+        });
 
-    db_exec.spawn(move |db| {
-        if let Some(db) = db.as_mut() {
-            db.buffer_notifications(|_| {
-                utils::set_static(&BUFFER_NOTIFICATIONS, true);
-            });
+        let mut doc = Document::new_with_id("document");
+        db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
 
-            let listener_token = db.add_listener(| _, doc_ids| {
-                if doc_ids.first().unwrap() == "document" {
-                    utils::set_static(&DOCUMENT_DETECTED, true);
-                }
-            });
+        assert!(!utils::check_static_with_wait(&DOCUMENT_DETECTED));
+        assert!(utils::check_static_with_wait(&BUFFER_NOTIFICATIONS));
 
-            let mut doc = Document::new_with_id("document");
-            db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+        db.send_notifications();
 
-            assert!(!utils::check_static_with_wait(&DOCUMENT_DETECTED));
-            assert!(utils::check_static_with_wait(&BUFFER_NOTIFICATIONS));
+        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED));
 
-            db.send_notifications();
-
-            assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED));
-
-            drop(listener_token);
-        } else {
-            println!("Error: DB is NOT open");
-        }
+        drop(listener_token);
     });
-
-    utils::close_db(db_thread, db_exec);
-    utils::delete_db(path);
 }
 
 /*

@@ -21,6 +21,7 @@ use super::c_api::*;
 
 
 /** An in-memory copy of a document. */
+#[derive(Debug)]
 pub struct Document {
     pub _ref: *mut CBLDocument,
     pub has_ownership: bool,
@@ -50,7 +51,7 @@ impl Database {
             // we always get a mutable CBLDocument,
             // since Rust doesn't let us have MutableDocument subclass.
             let mut error = CBLError::default();
-            let doc = CBLDatabase_GetMutableDocument(self._ref, as_slice(id), &mut error);
+            let doc = CBLDatabase_GetMutableDocument(self.get_ref(), as_slice(id), &mut error);
             if doc.is_null() {
                 if error.code != 0 {
                     return failure(error);
@@ -78,7 +79,7 @@ impl Database {
         let c_concurrency = concurrency as u8;
         unsafe {
             return check_bool(|error| CBLDatabase_SaveDocumentWithConcurrencyControl(
-                                            self._ref, doc._ref, c_concurrency, error))
+                                            self.get_ref(), doc._ref, c_concurrency, error))
         }
     }
 
@@ -95,7 +96,7 @@ impl Database {
 
     pub fn purge_document_by_id(&mut self, id: &str) -> Result<()> {
         unsafe {
-            return check_bool(|error| CBLDatabase_PurgeDocumentByID(self._ref, as_slice(id), error));
+            return check_bool(|error| CBLDatabase_PurgeDocumentByID(self.get_ref(), as_slice(id), error));
         }
     }
 
@@ -105,7 +106,7 @@ impl Database {
     pub fn document_expiration(&self, doc_id: &str) -> Result<Option<Timestamp>> {
         unsafe {
             let mut error = CBLError::default();
-            let exp = CBLDatabase_GetDocumentExpiration(self._ref, as_slice(doc_id), &mut error);
+            let exp = CBLDatabase_GetDocumentExpiration(self.get_ref(), as_slice(doc_id), &mut error);
             if exp < 0 {
                 return failure(error);
             } else if exp == 0 {
@@ -123,7 +124,7 @@ impl Database {
             _ => 0,
         };
         unsafe {
-            return check_bool(|error| CBLDatabase_SetDocumentExpiration(self._ref, as_slice(doc_id), exp, error));
+            return check_bool(|error| CBLDatabase_SetDocumentExpiration(self.get_ref(), as_slice(doc_id), exp, error));
         }
     }
 

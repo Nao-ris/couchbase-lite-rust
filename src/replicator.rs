@@ -34,31 +34,24 @@ use super::c_api::*;
 /** Represents the location of a database to replicate with. */
 #[derive(Debug, PartialEq, Eq)]
 pub struct Endpoint {
-    pub _ref: *mut CBLEndpoint,
-    has_ownership: bool,
+    pub(crate) _ref: *mut CBLEndpoint,
 }
 
 impl Endpoint {
-    pub fn new_with_url(url: String, owner: bool) -> Result<Self> {
+    pub fn new_with_url(url: String) -> Result<Self> {
         unsafe {
             let mut error = CBLError::default();
             let endpoint: *mut CBLEndpoint = CBLEndpoint_CreateWithURL(as_slice(&url), &mut error as *mut CBLError);
 
             check_error(&error).and_then(|()| {
-                Ok(Self {
-                    _ref: endpoint,
-                    has_ownership: owner,
-                })
+                Ok(Self { _ref: retain(endpoint) })
             })
         }
     }
 
-    pub fn new_with_local_db(db: &Database, owner: bool) -> Self {
+    pub fn new_with_local_db(db: &Database) -> Self {
         unsafe {
-            Self {
-                _ref: CBLEndpoint_CreateWithLocalDB(db._ref),
-                has_ownership: owner,
-            }
+            Self { _ref: retain(CBLEndpoint_CreateWithLocalDB(db.get_ref())) }
         }
     }
 }
@@ -66,34 +59,29 @@ impl Endpoint {
 impl Drop for Endpoint {
     fn drop(&mut self) {
         unsafe {
-            if self.has_ownership {
-                CBLEndpoint_Free(self._ref);
-            }
+            release(self._ref);
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Authenticator {
-    _ref: *mut CBLAuthenticator,
-    has_ownership: bool,
+    pub(crate) _ref: *mut CBLAuthenticator
 }
 
 impl Authenticator {
-    pub fn create_password(username: String, password: String, owner: bool) -> Self {
+    pub fn create_password(username: String, password: String) -> Self {
         unsafe {
             Self {
-                _ref: CBLAuth_CreatePassword(as_slice(&username), as_slice(&password)),
-                has_ownership: owner,
+                _ref: retain(CBLAuth_CreatePassword(as_slice(&username), as_slice(&password)))
             }
         }
     }
 
-    pub fn create_session(session_id: String, cookie_name: String, owner: bool) -> Self {
+    pub fn create_session(session_id: String, cookie_name: String) -> Self {
         unsafe {
             Self {
-                _ref: CBLAuth_CreateSession(as_slice(&session_id), as_slice(&cookie_name)),
-                has_ownership: owner,
+                _ref: retain(CBLAuth_CreateSession(as_slice(&session_id), as_slice(&cookie_name)))
             }
         }
     }
@@ -102,9 +90,7 @@ impl Authenticator {
 impl Drop for Authenticator {
     fn drop(&mut self) {
         unsafe {
-            if self.has_ownership {
-                CBLAuth_Free(self._ref);
-            }
+            release(self._ref);
         }
     }
 }
@@ -432,11 +418,8 @@ impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
             let context: *const ReplicationConfigurationContext = std::mem::transmute(config.context);
 
             ReplicatorConfiguration {
-                database: Database { _ref: config.database },
-                endpoint: Endpoint {
-                    _ref: config.endpoint,
-                    has_ownership: false,
-                },
+                database: Database::new_no_retain(config.database),
+                endpoint: Endpoint { _ref: config.endpoint },
                 replicator_type: config.replicatorType.into(),
                 continuous: config.continuous,
                 disable_auto_purge: config.disableAutoPurge,
@@ -446,10 +429,7 @@ impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
                 authenticator: if config.authenticator.is_null() {
                     None
                 } else {
-                    Some(Authenticator {
-                        _ref: config.authenticator,
-                        has_ownership: false,
-                    })
+                    Some(Authenticator { _ref: retain(config.authenticator) })
                 },
                 proxy: config.proxy.as_ref().map(|proxy| proxy.into()),
                 headers: Dict::wrap(config.headers, &config.headers),
@@ -483,8 +463,8 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
             .unwrap_or(ptr::null_mut());
         unsafe {
             CBLReplicatorConfiguration {
-                database: retain(config.database._ref),
-                endpoint: config.endpoint._ref,
+                database: retain(config.database.get_ref()),
+                endpoint: retain(config.endpoint._ref),
                 replicatorType: config.replicator_type.into(),
                 continuous: config.continuous,
                 disableAutoPurge: config.disable_auto_purge,
@@ -514,8 +494,7 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
 
 /** A background task that syncs a \ref Database with a remote server or peer. */
 pub struct Replicator {
-    _ref: *mut CBLReplicator,
-    has_ownership: bool,
+    _ref: *mut CBLReplicator
 }
 
 impl Replicator {
@@ -529,10 +508,7 @@ impl Replicator {
             let replicator = CBLReplicator_Create(cbl_config, &mut error as *mut CBLError);
 
             check_error(&error).and_then(|()| {
-                Ok(Replicator {
-                    _ref: replicator,
-                    has_ownership: true,
-                })
+                Ok(Replicator { _ref: replicator })
             })
         }
     }
@@ -588,8 +564,16 @@ impl Replicator {
 impl Drop for Replicator {
     fn drop(&mut self) {
         unsafe {
-            if self.has_ownership {
-                CBL_Release(self._ref as *mut CBLRefCounted)
+            release(self._ref)
+        }
+    }
+}
+
+impl Clone for Replicator {
+    fn clone(&self) -> Self {
+        unsafe {
+            return Replicator {
+                _ref: retain(self._ref)
             }
         }
     }
@@ -661,10 +645,7 @@ unsafe extern "C" fn c_replicator_change_listener(
 ) {
     let callback: ReplicatorChangeListener = std::mem::transmute(context);
 
-    let replicator = Replicator {
-        _ref: replicator,
-        has_ownership: false,
-    };
+    let replicator = Replicator { _ref: retain(replicator) };
     let status: ReplicatorStatus = (*status).into();
 
     callback(&replicator, status);
@@ -681,10 +662,7 @@ unsafe extern "C" fn c_replicator_document_change_listener(
 ) {
     let callback: ReplicatedDocumentListener = std::mem::transmute(context);
 
-    let replicator = Replicator {
-        _ref: replicator,
-        has_ownership: false,
-    };
+    let replicator = Replicator { _ref: retain(replicator) };
     let direction = if is_push { Direction::Pushed } else { Direction::Pulled};
 
     let repl_documents = std::slice::from_raw_parts(documents, num_documents as usize)

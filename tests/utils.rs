@@ -53,7 +53,7 @@ pub fn with_db<F>(f: F)
 
     f(&mut db);
 
-    drop(db);
+    db.delete().unwrap();
     if LEAK_CHECKS && instance_count() as isize > start_inst_count {
         warn!("Couchbase Lite objects were leaked by this test");
         dump_instances();
@@ -63,6 +63,38 @@ pub fn with_db<F>(f: F)
         // default. Looking for changes in the `instance_count()` is intrinsically not thread safe.
         // Either run tests with `cargo test -- --test-threads`, or turn off `LEAK_CHECKS`.
     }
+}
+
+pub fn with_three_dbs<F>(f: F)
+    where F: Fn(&mut Database, &mut Database, &mut Database)
+{
+    init_logging();
+
+    let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
+    let cfg1 = DatabaseConfiguration{
+        directory: tmp_dir.path(),
+        encryption_key: ptr::null_mut(),
+    };
+    let cfg2 = DatabaseConfiguration{
+        directory: tmp_dir.path(),
+        encryption_key: ptr::null_mut(),
+    };
+    let cfg3 = DatabaseConfiguration{
+        directory: tmp_dir.path(),
+        encryption_key: ptr::null_mut(),
+    };
+    let mut local_db1 = Database::open("local1", Some(cfg1)).expect("open db local1");
+    assert!(Database::exists("local1", tmp_dir.path()));
+    let mut local_db2 = Database::open("local2", Some(cfg2)).expect("open db local2");
+    assert!(Database::exists("local2", tmp_dir.path()));
+    let mut central_db = Database::open("central", Some(cfg3)).expect("open db central");
+    assert!(Database::exists("central", tmp_dir.path()));
+
+    f(&mut local_db1, &mut local_db2, &mut central_db);
+
+    local_db1.delete().unwrap();
+    local_db2.delete().unwrap();
+    central_db.delete().unwrap();
 }
 
 pub fn add_doc(db: &mut Database, id: &str, i: i64, s: &str) {

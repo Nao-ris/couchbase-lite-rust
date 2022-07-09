@@ -45,7 +45,7 @@ impl Query {
         unsafe {
             let mut pos: i32 = 0;
             let mut err = CBLError::default();
-            let q = CBLDatabase_CreateQuery(db._ref, language as CBLQueryLanguage, as_slice(str),
+            let q = CBLDatabase_CreateQuery(db.get_ref(), language as CBLQueryLanguage, as_slice(str),
                                             &mut pos, &mut err);
             if q.is_null() {
                 // TODO: Return the error pos somehow

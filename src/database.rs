@@ -52,7 +52,7 @@ unsafe extern "C" fn c_database_change_listener(
 ) {
     let callback: ChangeListener = std::mem::transmute(context);
 
-    let database = Database { _ref: db as *mut CBLDatabase };
+    let database = Database::new(db as *mut CBLDatabase);
 
     let doc_ids = std::slice::from_raw_parts(c_doc_ids, num_docs as usize)
         .iter()
@@ -70,7 +70,7 @@ unsafe extern "C" fn c_database_buffer_notifications(
 ) {
     let callback: BufferNotifications = std::mem::transmute(context);
 
-    let database = Database { _ref: db as *mut CBLDatabase };
+    let database = Database::new(db as *mut CBLDatabase);
 
     callback(&database);
 }
@@ -78,12 +78,22 @@ unsafe extern "C" fn c_database_buffer_notifications(
 /** A connection to an open database. */
 #[derive(Debug, PartialEq, Eq)]
 pub struct Database {
-    pub(crate) _ref: *mut CBLDatabase,
+    _ref: *mut CBLDatabase,
 }
 
 impl Database {
 
     //////// CONSTRUCTORS:
+
+    pub fn new(_ref: *mut CBLDatabase) -> Database {
+        Database { _ref: unsafe { retain(_ref) } }
+    }
+    pub fn new_no_retain(_ref: *mut CBLDatabase) -> Database {
+        Database { _ref: _ref }
+    }
+    pub(crate) fn get_ref(&self) -> *mut CBLDatabase {
+        self._ref
+    }
 
     /** Opens a database, or creates it if it doesn't exist yet, returning a new `Database`
         instance.
