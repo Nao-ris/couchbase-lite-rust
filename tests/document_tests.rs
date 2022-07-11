@@ -207,7 +207,7 @@ fn database_add_document_change_listener() {
         });
         document.mutable_properties().at("foo").put_i64(1);
         db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
-        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED));
+        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
         drop(listener_token);
     });
 }

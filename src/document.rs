@@ -23,8 +23,7 @@ use super::c_api::*;
 /** An in-memory copy of a document. */
 #[derive(Debug)]
 pub struct Document {
-    pub _ref: *mut CBLDocument,
-    has_ownership: bool,
+    _ref: *mut CBLDocument,
 }
 
 
@@ -46,7 +45,7 @@ unsafe extern "C" fn c_save_conflict_handler(
 ) -> bool {
     let callback: SaveConflictHandler = std::mem::transmute(context);
 
-    callback(&mut Document { _ref: user_doc, has_ownership: false }, &Document { _ref: existing_doc as *mut CBLDocument, has_ownership: false })
+    callback(&mut Document::wrap(user_doc), &Document::wrap(existing_doc as *mut CBLDocument))
 }
 
 pub type ChangeListener = fn(&Database, &str);
@@ -58,10 +57,7 @@ unsafe extern "C" fn c_document_change_listener(
 ) {
     let callback: ChangeListener = std::mem::transmute(context);
 
-    let database = Database {
-        _ref: db as *mut CBLDatabase,
-        has_ownership: false,
-    };
+    let database = Database::new(db as *mut CBLDatabase);
 
     callback(&database, c_doc_id.to_string().unwrap().as_ref());
 }
@@ -82,7 +78,7 @@ impl Database {
                     return Err(Error::cbl_error(CouchbaseLiteError::NotFound));
                 }
             }
-            return Ok(Document { _ref: doc , has_ownership: true});
+            return Ok(Document::wrap_no_retain(doc));
         }
     }
 
@@ -114,7 +110,7 @@ impl Database {
         unsafe {
             let callback: *mut ::std::os::raw::c_void = std::mem::transmute(conflict_handler);
             match check_bool(|error| CBLDatabase_SaveDocumentWithConflictHandler(
-                self._ref, doc._ref, Some(c_save_conflict_handler), callback, error)) {
+                self.get_ref(), doc._ref, Some(c_save_conflict_handler), callback, error)) {
                 Ok(_) => Ok(doc.to_owned()),
                 Err(err) => Err(err)
             }
@@ -124,13 +120,13 @@ impl Database {
     pub fn delete_document(&mut self, doc: &Document, concurrency: ConcurrencyControl) -> Result<()> {
         let c_concurrency = concurrency as u8;
         unsafe {
-            return check_bool(|error| CBLDatabase_DeleteDocumentWithConcurrencyControl(self._ref, doc._ref, c_concurrency, error));
+            return check_bool(|error| CBLDatabase_DeleteDocumentWithConcurrencyControl(self.get_ref(), doc._ref, c_concurrency, error));
         }
     }
 
     pub fn purge_document(&mut self, doc: &Document) -> Result<()> {
         unsafe {
-            return check_bool(|error| CBLDatabase_PurgeDocument(self._ref, doc._ref, error));
+            return check_bool(|error| CBLDatabase_PurgeDocument(self.get_ref(), doc._ref, error));
         }
     }
 
@@ -175,7 +171,7 @@ impl Database {
             let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
 
             ListenerToken {
-                _ref: CBLDatabase_AddDocumentChangeListener(self._ref, CBLDocument_ID(document._ref), Some(c_document_change_listener), callback)
+                _ref: CBLDatabase_AddDocumentChangeListener(self.get_ref(), CBLDocument_ID(document._ref), Some(c_document_change_listener), callback)
             }
         }
     }
@@ -188,11 +184,13 @@ impl Database {
 
 impl Document {
 
+    //////// CONSTRUCTORS:
+
     /** Creates a new, empty document in memory, with an automatically generated unique ID.
         It will not be added to a database until saved. */
     pub fn new() -> Self {
         unsafe {
-            Document { _ref: CBLDocument_Create() , has_ownership: true}
+            Document { _ref: CBLDocument_Create()}
         }
     }
 
@@ -200,7 +198,20 @@ impl Document {
         It will not be added to a database until saved. */
     pub fn new_with_id(id: &str) -> Self {
         unsafe {
-            Document { _ref: CBLDocument_CreateWithID(as_slice(id)) , has_ownership: true} }
+            Document { _ref: CBLDocument_CreateWithID(as_slice(id))}
+        }
+    }
+
+    pub unsafe fn wrap(_ref: *mut CBLDocument) -> Self {
+        Document { _ref: retain(_ref)}
+    }
+
+    pub unsafe fn wrap_no_retain(_ref: *mut CBLDocument) -> Self {
+        Document { _ref: _ref}
+    }
+
+    pub fn get_ref(&self) -> *mut CBLDocument {
+        self._ref
     }
 
     /** Returns the document's ID. */
@@ -262,10 +273,8 @@ impl Document {
 
 impl Drop for Document {
     fn drop(&mut self) {
-        if self.has_ownership {
-            unsafe {
-                release(self._ref)
-            }
+        unsafe {
+            release(self._ref)
         }
     }
 }
@@ -275,8 +284,7 @@ impl Clone for Document {
     fn clone(&self) -> Self {
         unsafe {
             Document{
-                _ref: retain(self._ref),
-                has_ownership: true
+                _ref: retain(self._ref)
             }
         }
     }
