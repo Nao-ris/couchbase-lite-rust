@@ -153,6 +153,7 @@ fn database_delete_document() {
         db.save_document(&mut document, ConcurrencyControl::FailOnConflict).expect("save_document");
         db.delete_document(&document, ConcurrencyControl::FailOnConflict).expect("delete_document");
         let document = db.get_document("foo");
+        // FIXME delete doesn't seem to work just like that (maybe need for replication)
         assert!(document.is_err());
     });
 }
