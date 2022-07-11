@@ -24,7 +24,6 @@ use super::c_api::*;
 #[derive(Debug)]
 pub struct Document {
     pub _ref: *mut CBLDocument,
-    pub has_ownership: bool,
 }
 
 
@@ -59,10 +58,7 @@ impl Database {
                     return Err(Error::cbl_error(CouchbaseLiteError::NotFound));
                 }
             }
-            return Ok(Document{
-                _ref: doc,
-                has_ownership: true,
-            });
+            return Ok(Document { _ref: doc });
         }
     }
 
@@ -146,10 +142,7 @@ impl Document {
         It will not be added to a database until saved. */
     pub fn new() -> Self {
         unsafe {
-            Document{
-                _ref: CBLDocument_Create(),
-                has_ownership: true,
-            }
+            Document { _ref: CBLDocument_Create() }
         }
     }
 
@@ -157,10 +150,7 @@ impl Document {
         It will not be added to a database until saved. */
     pub fn new_with_id(id: &str) -> Self {
         unsafe {
-            Document{
-                _ref: CBLDocument_CreateWithID(as_slice(id)),
-                has_ownership: true,
-            }
+            Document { _ref: CBLDocument_CreateWithID(as_slice(id)) }
         }
     }
 
@@ -236,15 +226,13 @@ impl Document {
 impl Drop for Document {
     fn drop(&mut self) {
         unsafe {
-            if self.has_ownership {
-                release(self._ref);
-            }
+            release(self._ref);
         }
     }
 }
 
 
-/*impl Clone for Document {
+impl Clone for Document {
     fn clone(&self) -> Self {
         unsafe {
             Document{
@@ -252,4 +240,4 @@ impl Drop for Document {
             }
         }
     }
-}*/
+}

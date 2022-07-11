@@ -79,7 +79,7 @@ fn add_listener() {
         let mut doc = Document::new_with_id("document");
         db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
 
-        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED));
+        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
 
         drop(listener_token);
     });
@@ -104,12 +104,12 @@ fn buffer_notifications() {
         let mut doc = Document::new_with_id("document");
         db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
 
-        assert!(!utils::check_static_with_wait(&DOCUMENT_DETECTED));
-        assert!(utils::check_static_with_wait(&BUFFER_NOTIFICATIONS));
+        assert!(!utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
+        assert!(utils::check_static_with_wait(&BUFFER_NOTIFICATIONS, true, None));
 
         db.send_notifications();
 
-        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED));
+        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
 
         drop(listener_token);
     });

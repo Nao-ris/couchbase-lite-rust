@@ -6,9 +6,8 @@ use self::couchbase_lite::*;
 use self::tempdir::TempDir;
 
 use std::{
-    path::Path,
     ptr,
-    sync::{Arc, Mutex, mpsc},
+    sync::{Arc, Mutex, MutexGuard },
     thread, time,
 };
 
@@ -105,83 +104,41 @@ pub fn add_doc(db: &mut Database, id: &str, i: i64, s: &str) {
     db.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
 }
 
-pub fn check_static_with_wait(st: &Arc<Mutex<bool>>) -> bool {
-    let ten_seconds = time::Duration::from_secs(10);
-    let now = time::Instant::now();
-    let wait_fetch_document = time::Duration::from_millis(1000);
+// Static
 
-    while !is_static_true(&st) && now.elapsed() < ten_seconds {
-        thread::sleep(wait_fetch_document);
+pub fn get_static<T>(st: &Arc<Mutex<T>>) -> MutexGuard<T> {
+    if let Ok(st) = st.lock() {
+        st
+    } else {
+        panic!("Impossible to lock static")
     }
-
-    is_static_true(&st)
 }
-pub fn is_static_true(st: &Arc<Mutex<bool>>) -> bool {
+pub fn get_static_value<T>(st: &Arc<Mutex<T>>) -> T
+    where T: Copy {
     if let Ok(st) = st.lock() {
         *st
     } else {
-        false
+        panic!("Impossible to lock static")
     }
 }
-pub fn set_static(st: &Arc<Mutex<bool>>, value: bool) {
-    if let Ok(mut st) = st.lock() {
-        *st = value;
+pub fn set_static<T>(st: &Arc<Mutex<T>>, value: T) {
+    *get_static(st) = value;
+}
+
+pub fn is_static_true(st: &Arc<Mutex<bool>>) -> bool {
+    get_static_value(st)
+}
+pub fn check_static_with_wait<T>(st: &Arc<Mutex<T>>, expected_value: T, max_wait_seconds: Option<u64>) -> bool
+    where T: Copy + std::cmp::PartialEq {
+    let max_wait_seconds = time::Duration::from_secs(max_wait_seconds.unwrap_or(10));
+    let now = time::Instant::now();
+    let wait_time = time::Duration::from_millis(100);
+
+    let mut result = get_static_value(st) == expected_value;
+    while !result && now.elapsed() < max_wait_seconds {
+        thread::sleep(wait_time);
+        result = get_static_value(st) == expected_value;
     }
-}
 
-pub fn close_db(db_thread: std::thread::JoinHandle<()>, db_exec: DbQueryExecutor) {
-    drop(db_exec);
-    db_thread.join().expect("Couldn't join on the DB thread");
-}
-
-pub fn delete_db(db_path: &Path) {
-    match Database::open(db_path.clone().to_str().unwrap(), None) {
-        Ok(db) => {
-            db.delete().unwrap();
-        }
-        Err(err) => {
-            println!("Error: Initialiazion cause error: {}", err);
-        }
-    };
-}
-
-type Job<T> = Box<dyn FnOnce(&mut Option<T>) + Send>;
-
-#[derive(Clone)]
-pub struct DbQueryExecutor {
-    inner: mpsc::Sender<Job<Database>>,
-}
-
-impl DbQueryExecutor {
-    pub fn spawn<F: FnOnce(&mut Option<Database>) + Send + 'static>(&self, job: F) {
-        self.inner
-            .send(Box::new(job))
-            .expect("thread_pool::Executor::spawn failed");
-    }
-}
-
-pub fn run_db_thread(db_path: &Path) -> (std::thread::JoinHandle<()>, DbQueryExecutor) {
-    let (sender, receiver) = std::sync::mpsc::channel::<Job<Database>>();
-    let db_path: std::path::PathBuf = db_path.into();
-    let join_handle = std::thread::spawn(move || {
-        let mut db = match Database::open(db_path.as_path().to_str().unwrap(), None) {
-            Ok(db) => {
-                Some(db)
-            }
-            Err(err) => {
-                println!("Error: Initialiazion cause error: {}", err);
-                None
-            }
-        };
-        loop {
-            match receiver.recv() {
-                Ok(x) => x(&mut db),
-                Err(err) => {
-                    println!("Error: db_thread recv error: {}", err);
-                    break;
-                }
-            }
-        }
-    });
-    (join_handle, DbQueryExecutor { inner: sender })
+    result
 }

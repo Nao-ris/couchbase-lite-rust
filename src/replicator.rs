@@ -187,8 +187,7 @@ unsafe extern "C" fn c_replication_push_filter(
     let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
     let document = Document {
-        _ref: document as *mut CBLDocument,
-        has_ownership: false,
+        _ref: retain(document as *mut CBLDocument),
     };
 
     let (is_deleted, is_access_removed) = read_document_flags(flags);
@@ -205,8 +204,7 @@ unsafe extern "C" fn c_replication_pull_filter(
     let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
     let document = Document {
-        _ref: document as *mut CBLDocument,
-        has_ownership: false,
+        _ref: retain(document as *mut CBLDocument),
     };
 
     let (is_deleted, is_access_removed) = read_document_flags(flags);
@@ -237,16 +235,14 @@ unsafe extern "C" fn c_replication_conflict_resolver(
     let doc_id = document_id.to_string().unwrap_or("".to_string());
     let local_document = if local_document.is_null() {
         Some(Document {
-            _ref: local_document as *mut CBLDocument,
-            has_ownership: false,
+            _ref: retain(local_document as *mut CBLDocument),
         })
     } else {
         None
     };
     let remote_document = if remote_document.is_null() {
         Some(Document {
-            _ref: remote_document as *mut CBLDocument,
-            has_ownership: false,
+            _ref: retain(remote_document as *mut CBLDocument),
         })
     } else {
         None
