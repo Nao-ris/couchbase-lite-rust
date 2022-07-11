@@ -143,3 +143,21 @@ fn mutable_dict() {
     dict.remove("i");
     assert!(!dict.get("i"));
 }
+
+#[test]
+fn mutable_dict_to_from_hash_map() {
+    let mut dict = MutableDict::new();
+
+    dict.at("id1").put_string("value1");
+    dict.at("id2").put_string("value2");
+
+    let hash_map = dict.to_hashmap();
+    assert_eq!(hash_map.len(), 2);
+    assert_eq!(hash_map.get("id1"), Some(&"value1".to_string()));
+    assert_eq!(hash_map.get("id2"), Some(&"value2".to_string()));
+
+    let new_dict = MutableDict::from_hashmap(&hash_map);
+    assert_eq!(new_dict.count(), 2);
+    assert_eq!(new_dict.get("id1").as_string(), Some("value1"));
+    assert_eq!(new_dict.get("id2").as_string(), Some("value2"));
+}

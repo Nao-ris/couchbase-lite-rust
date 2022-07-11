@@ -20,6 +20,7 @@ use super::slice::*;
 use super::c_api::*;
 use super::fleece::*;
 
+use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
 use std::ptr;
@@ -199,6 +200,18 @@ impl MutableDict {
 
     pub fn remove_all(&mut self) {
         unsafe { FLMutableDict_RemoveAll(self._ref) }
+    }
+
+    pub fn to_hashmap(&self) -> HashMap<String, String> {
+        self.into_iter()
+            .map(|tuple| (tuple.0.to_string(), String::from(tuple.1.as_string().unwrap_or(""))))
+            .collect::<HashMap<String, String>>()
+    }
+
+    pub fn from_hashmap(map: &HashMap<String, String>) -> MutableDict {
+        let mut dict = MutableDict::new();
+        map.iter().for_each(|(key, value)| dict.at(key.as_str()).put_string(value.as_str()));
+        dict
     }
 }
 

@@ -19,6 +19,7 @@
 
 use slice::as_slice;
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ptr;
 
@@ -370,8 +371,8 @@ struct ReplicationConfigurationContext {
 
 /** The configuration of a replicator. */
 pub struct ReplicatorConfiguration<'c> {
-    pub database:                  Database,                     // The database to replicate
-    pub endpoint:                  Endpoint,                     // The address of the other database to replicate with
+    pub database:                  Database,                         // The database to replicate
+    pub endpoint:                  Endpoint,                         // The address of the other database to replicate with
     pub replicator_type:           ReplicatorType,                   // Push, pull or both
     pub continuous:                bool,                             // Continuous replication?
     //-- Auto Purge:
@@ -391,15 +392,15 @@ pub struct ReplicatorConfiguration<'c> {
     pub max_attempt_wait_time:     u32,	                             //< Max wait time between retry attempts in seconds. Specify 0 to use the default value of 300 seconds.
     //-- WebSocket:
     pub heartbeat:                 u32,                              //< The heartbeat interval in seconds. Specify 0 to use the default value of 300 seconds.
-    pub authenticator:             Option<Authenticator>,                // Authentication credentials, if needed
+    pub authenticator:             Option<Authenticator>,            // Authentication credentials, if needed
     pub proxy:                     Option<ProxySettings>,            // HTTP client proxy settings
-    pub headers:                   Dict<'c>,                     // Extra HTTP headers to add to the WebSocket request
+    pub headers:                   HashMap<String, String>,          // Extra HTTP headers to add to the WebSocket request
     //-- TLS settings:
-    pub pinned_server_certificate: Option<&'c [u8]>,                  // An X.509 cert to "pin" TLS connections to (PEM or DER)
-    pub trusted_root_certificates: Option<&'c [u8]>,                  // Set of anchor certs (PEM format)
+    pub pinned_server_certificate: Option<&'c [u8]>,                 // An X.509 cert to "pin" TLS connections to (PEM or DER)
+    pub trusted_root_certificates: Option<&'c [u8]>,                 // Set of anchor certs (PEM format)
     //-- Filtering:
-    pub channels:                  Array<'c>,             // Optional set of channels to pull from
-    pub document_ids:              Array<'c>,             // Optional set of document IDs to replicate
+    pub channels:                  Array<'c>,                        // Optional set of channels to pull from
+    pub document_ids:              Array<'c>,                        // Optional set of document IDs to replicate
     pub push_filter:               Option<ReplicationFilter>,        // Optional callback to filter which docs are pushed
     pub pull_filter:               Option<ReplicationFilter>,        // Optional callback to validate incoming docs
     pub conflict_resolver:         Option<ConflictResolver>,         // Optional conflict-resolver callback
@@ -428,7 +429,7 @@ impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
                     Some(Authenticator { _ref: retain(config.authenticator) })
                 },
                 proxy: config.proxy.as_ref().map(|proxy| proxy.into()),
-                headers: Dict::wrap(config.headers, &config.headers),
+                headers: Dict::wrap(config.headers, &config.headers).mutable_copy().to_hashmap(),
                 pinned_server_certificate: config.pinnedServerCertificate.as_byte_array(),
                 trusted_root_certificates: config.trustedRootCertificates.as_byte_array(),
                 channels: Array::wrap(config.channels, &config.channels),
@@ -469,7 +470,7 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
                 heartbeat: config.heartbeat,
                 authenticator: config.authenticator.map(|a| a._ref).unwrap_or(ptr::null_mut()),
                 proxy: proxy,
-                headers: config.headers._ref,
+                headers: MutableDict::from_hashmap(&config.headers).as_dict()._ref,
                 pinnedServerCertificate: config.pinned_server_certificate.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
                 trustedRootCertificates: config.trusted_root_certificates.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
                 channels: config.channels._ref,

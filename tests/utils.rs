@@ -6,6 +6,7 @@ use self::couchbase_lite::*;
 use self::tempdir::TempDir;
 
 use std::{
+    collections::HashMap,
     ptr,
     sync::{Arc, Mutex, MutexGuard },
     thread, time,
@@ -64,11 +65,64 @@ pub fn with_db<F>(f: F)
     }
 }
 
-pub fn with_three_dbs<F>(f: F)
-    where F: Fn(&mut Database, &mut Database, &mut Database)
+// Replication
+
+pub struct ReplicationTestConfiguration<'a> {
+    pub replicator_type: ReplicatorType,
+    pub continuous: bool,
+    pub document_ids: Array<'a>,
+    pub push_filter: Option<ReplicationFilter>,
+    pub pull_filter: Option<ReplicationFilter>,
+    pub conflict_resolver: Option<ConflictResolver>,
+    pub property_encryptor: Option<PropertyEncryptor>,
+    pub property_decryptor: Option<PropertyDecryptor>,
+}
+impl<'a> Default for ReplicationTestConfiguration<'a> {
+    fn default() -> Self {
+        Self {
+            replicator_type: ReplicatorType::PushAndPull,
+            continuous: true,
+            document_ids: Array::default(),
+            push_filter: None,
+            pull_filter: None,
+            conflict_resolver: None,
+            property_encryptor: None,
+            property_decryptor: None,
+        }
+    }
+}
+
+fn generate_replication_configuration<'a>(local_db: &Database, central_db: &Database, config: ReplicationTestConfiguration<'a>) -> ReplicatorConfiguration<'a> {
+    ReplicatorConfiguration {
+        database: local_db.clone(),
+        endpoint: Endpoint::new_with_local_db(central_db),
+        replicator_type: config.replicator_type,
+        continuous: config.continuous,
+        disable_auto_purge: true,
+        max_attempts: 4,
+        max_attempt_wait_time: 100,
+        heartbeat: 120,
+        authenticator: None,
+        proxy: None,
+        headers: HashMap::new(),
+        pinned_server_certificate: None,
+        trusted_root_certificates: None,
+        channels: Array::default(),
+        document_ids: config.document_ids,
+        push_filter: config.push_filter,
+        pull_filter: config.pull_filter,
+        conflict_resolver: config.conflict_resolver,
+        property_encryptor: config.property_encryptor,
+        property_decryptor: config.property_decryptor,
+    }
+}
+
+pub fn with_three_dbs<F>(config1: ReplicationTestConfiguration, config2: ReplicationTestConfiguration, f: F)
+    where F: Fn(&mut Database, &mut Database, &mut Database, &mut Replicator, &mut Replicator)
 {
     init_logging();
 
+    // Create databases
     let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
     let cfg1 = DatabaseConfiguration{
         directory: tmp_dir.path(),
@@ -89,7 +143,23 @@ pub fn with_three_dbs<F>(f: F)
     let mut central_db = Database::open("central", Some(cfg3)).expect("open db central");
     assert!(Database::exists("central", tmp_dir.path()));
 
-    f(&mut local_db1, &mut local_db2, &mut central_db);
+    // Create replicators
+    let config1 = generate_replication_configuration(&local_db1, &central_db, config1);
+    let mut repl1 = Replicator::new(config1).unwrap();
+
+    let config2 = generate_replication_configuration(&local_db2, &central_db, config2);
+    let mut repl2 = Replicator::new(config2).unwrap();
+
+    // Start replicators
+    repl1.start(false);
+    repl2.start(false);
+
+    // Callback
+    f(&mut local_db1, &mut local_db2, &mut central_db, &mut repl1, &mut repl2);
+
+    // Clean up
+    repl1.stop();
+    repl2.stop();
 
     local_db1.delete().unwrap();
     local_db2.delete().unwrap();
