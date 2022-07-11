@@ -85,12 +85,7 @@ fn basic_local_replication() {
 
     utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
         // Save doc
-        let mut doc = Document::new_with_id("foo");
-        let mut props = doc.mutable_properties();
-        props.at("i").put_i64(1234);
-        props.at("s").put_string("Hello World!");
-
-        local_db1.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
         // Check if replication to central
         assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
@@ -110,12 +105,7 @@ fn pull_type_not_pushing() {
 
     utils::with_three_dbs(config1, config2, |local_db1, _local_db2, central_db, _repl1, _repl2| {
         // Save doc
-        let mut doc = Document::new_with_id("foo");
-        let mut props = doc.mutable_properties();
-        props.at("i").put_i64(1234);
-        props.at("s").put_string("Hello World!");
-
-        local_db1.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
         // Check the replication process is not pushing to central
         assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
@@ -132,12 +122,7 @@ fn push_type_not_pulling() {
 
     utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
         // Save doc
-        let mut doc = Document::new_with_id("foo");
-        let mut props = doc.mutable_properties();
-        props.at("i").put_i64(1234);
-        props.at("s").put_string("Hello World!");
-
-        local_db1.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
         // Check if replication to central
         assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
@@ -157,12 +142,7 @@ fn continuous() {
 
     utils::with_three_dbs(config1, config2, |local_db1, _local_db2, central_db, repl1, _repl2| {
         // Save doc
-        let mut doc = Document::new_with_id("foo");
-        let mut props = doc.mutable_properties();
-        props.at("i").put_i64(1234);
-        props.at("s").put_string("Hello World!");
-
-        local_db1.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
         // Check the replication process is not running automatically
         assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
@@ -187,24 +167,40 @@ fn document_ids() {
     let config2: utils::ReplicationTestConfiguration = Default::default();
 
     utils::with_three_dbs(config1, config2, |local_db1, _local_db2, central_db, _repl1, _repl2| {
-        // Save doc 'foo'
-        let mut doc = Document::new_with_id("foo");
-        let mut props = doc.mutable_properties();
-        props.at("i").put_i64(1234);
-        props.at("s").put_string("Hello World!");
+        // Save doc 'foo' and 'foo2'
+        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+        utils::add_doc(local_db1, "foo2", 1234, "Hello World!");
 
-        local_db1.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
-
-        // Save doc 'foo2'
-        let mut doc2 = Document::new_with_id("foo2");
-        let mut props = doc2.mutable_properties();
-        props.at("i").put_i64(1234);
-        props.at("s").put_string("Hello World!");
-
-        local_db1.save_document(&mut doc2, ConcurrencyControl::FailOnConflict).expect("save");
-
-        // Check the replication process is not running automatically
+        // Check only foo is replicated
         assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
         assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo2").is_ok(), None));
+    });
+}
+
+#[test]
+fn push_and_pull_filter() {
+    let config1 = utils::ReplicationTestConfiguration {
+        push_filter: Some(|document, _is_deleted, _is_access_removed| document.id() == "foo" || document.id() == "foo2"),
+        ..Default::default()
+    };
+    let config2: utils::ReplicationTestConfiguration = utils::ReplicationTestConfiguration {
+        pull_filter: Some(|document, _is_deleted, _is_access_removed| document.id() == "foo2" || document.id() == "foo3"),
+        ..Default::default()
+    };
+
+    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
+        // Save doc 'foo', 'foo2' & 'foo3'
+        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+        utils::add_doc(local_db1, "foo2", 1234, "Hello World!");
+        utils::add_doc(local_db1, "foo3", 1234, "Hello World!");
+
+        // Check only 'foo' and 'foo2' were replicated to central
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo2").is_ok(), None));
+        assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo3").is_ok(), None));
+
+        // Check only foo2' were replicated to DB 2
+        assert!(!utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
+        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo2").is_ok(), None));
     });
 }

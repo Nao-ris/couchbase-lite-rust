@@ -219,7 +219,7 @@ pub fn check_callback_with_wait<CB>(mut callback: CB, max_wait_seconds: Option<u
     let wait_time = time::Duration::from_millis(100);
 
     let mut result = callback();
-    while !callback() && now.elapsed() < max_wait_seconds {
+    while !result && now.elapsed() < max_wait_seconds {
         thread::sleep(wait_time);
         result = callback();
     }
