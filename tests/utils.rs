@@ -36,8 +36,8 @@ fn init_logging() {
 }
 
 // Test wrapper function -- takes care of creating and deleting the database.
-pub fn with_db<F>(mut f: F)
-    where F: FnMut(&mut Database)
+pub fn with_db<F>(f: F)
+    where F: Fn(&mut Database)
 {
     init_logging();
 
