@@ -142,3 +142,17 @@ pub fn check_static_with_wait<T>(st: &Arc<Mutex<T>>, expected_value: T, max_wait
 
     result
 }
+pub fn check_callback_with_wait<CB>(mut callback: CB, max_wait_seconds: Option<u64>) -> bool
+    where CB: FnMut() -> bool {
+    let max_wait_seconds = time::Duration::from_secs(max_wait_seconds.unwrap_or(10));
+    let now = time::Instant::now();
+    let wait_time = time::Duration::from_millis(100);
+
+    let mut result = callback();
+    while !callback() && now.elapsed() < max_wait_seconds {
+        thread::sleep(wait_time);
+        result = callback();
+    }
+
+    result
+}

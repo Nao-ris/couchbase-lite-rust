@@ -414,7 +414,7 @@ impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
             let context: *const ReplicationConfigurationContext = std::mem::transmute(config.context);
 
             ReplicatorConfiguration {
-                database: Database::new_no_retain(config.database),
+                database: Database::wrap_no_retain(config.database),
                 endpoint: Endpoint { _ref: config.endpoint },
                 replicator_type: config.replicatorType.into(),
                 continuous: config.continuous,

@@ -21,8 +21,6 @@ use self::couchbase_lite::*;
 
 pub mod utils;
 
-use std::{ thread, time };
-
 //////// TESTS:
 
 #[test]
@@ -123,18 +121,7 @@ fn basic_local_replication() {
         local_db1.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
 
         // Check if replication
-        let ten_seconds = time::Duration::from_secs(10);
-        let now = time::Instant::now();
-        let wait_fetch_document = time::Duration::from_millis(1000);
-
-        let mut doc_found = false;
-        while !doc_found && now.elapsed() < ten_seconds {
-            let doc = central_db.get_document("foo");
-            doc_found = doc.is_ok();
-            thread::sleep(wait_fetch_document);
-        }
-
-        assert_eq!(doc_found, true);
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
 
         // Stop replication
         repl.stop();
