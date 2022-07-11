@@ -101,7 +101,7 @@ pub fn add_doc(db: &mut Database, id: &str, i: i64, s: &str) {
     let mut props = doc.mutable_properties();
     props.at("i").put_i64(i);
     props.at("s").put_string(s);
-    db.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+    db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
 }
 
 // Static

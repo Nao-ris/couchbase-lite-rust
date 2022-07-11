@@ -83,25 +83,40 @@ impl Database {
     }
 
     /** Saves a new or modified document to the database.
-        If a conflicting revision has been saved since `doc` was loaded, the `concurrency`
-        parameter specifies whether the save should fail, or the conflicting revision should
-        be overwritten with the revision being saved.
-        If you need finer-grained control, call `save_document_resolving` instead. */
+              If a newer revision has been saved since \p doc was loaded, it will be overwritten by
+              this one. This can lead to data loss! To avoid this, call
+              `save_document_with_concurency_control` or
+              `save_document_resolving` instead. */
     pub fn save_document(&mut self,
-                         doc: &mut Document,
-                         concurrency: ConcurrencyControl)
+                         doc: &mut Document)
                          -> Result<()>
+    {
+        unsafe {
+            return check_bool(|error| CBLDatabase_SaveDocument(
+                self.get_ref(), doc._ref, error))
+        }
+    }
+
+    /** Saves a new or modified document to the database.
+              If a conflicting revision has been saved since `doc` was loaded, the `concurrency`
+              parameter specifies whether the save should fail, or the conflicting revision should
+              be overwritten with the revision being saved.
+              If you need finer-grained control, call `save_document_resolving` instead. */
+    pub fn save_document_with_concurency_control(&mut self,
+                                                 doc: &mut Document,
+                                                 concurrency: ConcurrencyControl)
+                                                 -> Result<()>
     {
         let c_concurrency = concurrency as u8;
         unsafe {
             return check_bool(|error| CBLDatabase_SaveDocumentWithConcurrencyControl(
-                                            self.get_ref(), doc._ref, c_concurrency, error))
+                self.get_ref(), doc._ref, c_concurrency, error))
         }
     }
 
     /** Saves a new or modified document to the database. This function is the same as
-        `save_document`, except that it allows for custom conflict handling in the event
-        that the document has been updated since `doc` was loaded. */
+           `save_document`, except that it allows for custom conflict handling in the event
+           that the document has been updated since `doc` was loaded. */
     pub fn save_document_resolving(&mut self,
                                    doc: &mut Document,
                                    conflict_handler: SaveConflictHandler)
@@ -117,7 +132,13 @@ impl Database {
         }
     }
 
-    pub fn delete_document(&mut self, doc: &Document, concurrency: ConcurrencyControl) -> Result<()> {
+    pub fn delete_document(&mut self, doc: &Document) -> Result<()> {
+        unsafe {
+            return check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc._ref, error));
+        }
+    }
+
+    pub fn delete_document_with_concurency_control(&mut self, doc: &Document, concurrency: ConcurrencyControl) -> Result<()> {
         let c_concurrency = concurrency as u8;
         unsafe {
             return check_bool(|error| CBLDatabase_DeleteDocumentWithConcurrencyControl(self.get_ref(), doc._ref, c_concurrency, error));
