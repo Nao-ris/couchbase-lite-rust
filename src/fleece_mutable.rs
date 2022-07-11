@@ -20,6 +20,8 @@ use super::slice::*;
 use super::c_api::*;
 use super::fleece::*;
 
+use field_encryption::Encryptable;
+
 use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
@@ -208,6 +210,12 @@ impl MutableDict {
             .collect::<HashMap<String, String>>()
     }
 
+    pub fn set_encryptable_value(dict: MutableDict, key: String, encryptable: Encryptable) {
+        unsafe {
+            FLSlot_SetEncryptableValue(FLMutableDict_Set(dict._ref, as_slice(&key)), encryptable._ref);
+        }
+    }
+
     pub fn from_hashmap(map: &HashMap<String, String>) -> MutableDict {
         let mut dict = MutableDict::new();
         map.iter().for_each(|(key, value)| dict.at(key.as_str()).put_string(value.as_str()));
@@ -325,5 +333,9 @@ impl<'s> Slot<'s> {
 
     pub fn put_value<VALUE: FleeceReference>(self, value: &VALUE)  {
         unsafe { FLSlot_SetValue(self._ref, value._fleece_ref()) }
+    }
+
+    pub fn put_encrypt(self, value: &field_encryption::Encryptable) {
+        unsafe { FLSlot_SetEncryptableValue(self._ref, value._ref) }
     }
 }

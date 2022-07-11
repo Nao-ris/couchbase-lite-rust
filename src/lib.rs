@@ -24,6 +24,7 @@ pub mod blob;
 pub mod database;
 pub mod document;
 pub mod error;
+pub mod field_encryption;
 pub mod fleece;
 pub mod fleece_mutable;
 pub mod logging;

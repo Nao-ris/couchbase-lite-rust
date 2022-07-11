@@ -20,6 +20,8 @@ use super::slice::*;
 use super::error::*;
 use super::c_api::*;
 
+use field_encryption::Encryptable;
+
 use enum_primitive::FromPrimitive;
 use std::collections::HashSet;
 use std::fmt;
@@ -167,6 +169,7 @@ impl<'f> Value<'f> {
 
     pub fn is_number(&self)  -> bool    {self.is_type(ValueType::Number)}
     pub fn is_integer(&self) -> bool    {unsafe { FLValue_IsInteger(self._ref) } }
+    pub fn is_encryptable(&self) -> bool { unsafe { FLDict_IsEncryptableValue(FLValue_AsDict(self._ref)) } }
 
     pub fn as_i64(&self) -> Option<i64>  {if self.is_integer() {Some(self.as_i64_or_0())} else {None} }
     pub fn as_u64(&self) -> Option<u64>  {if self.is_integer() {Some(self.as_u64_or_0())} else {None} }
@@ -204,6 +207,13 @@ impl<'f> Value<'f> {
 
     pub fn as_dict(&self) -> Dict<'f> {
         unsafe { Dict{_ref: FLValue_AsDict(self._ref), _owner: self._owner} }
+    }
+
+    pub fn get_encryptable_value(&self) -> Encryptable {
+        unsafe {
+            let encryptable = FLDict_GetEncryptableValue(FLValue_AsDict(self._ref));
+            Encryptable::new(encryptable as *mut CBLEncryptable)
+        }
     }
 }
 
@@ -375,12 +385,21 @@ impl<'f> Dict<'f> {
     pub fn count(&self) -> u32 { unsafe { FLDict_Count(self._ref) }}
     pub fn empty(&self) -> bool { unsafe { FLDict_IsEmpty(self._ref) }}
 
+    pub fn is_encryptable(&self) -> bool { unsafe { FLDict_IsEncryptableValue(self._ref) } }
+
     pub fn get(&self, key: &str) -> Value<'f> {
         unsafe { Value{_ref: FLDict_Get(self._ref, as_slice(key)), _owner: self._owner} }
     }
 
     pub fn get_key(&self, key: &mut DictKey) -> Value<'f> {
         unsafe { Value{_ref: FLDict_GetWithKey(self._ref, &mut key._innards), _owner: self._owner} }
+    }
+
+    pub fn get_encryptable_value(&self) -> Encryptable {
+        unsafe {
+            let encryptable = FLDict_GetEncryptableValue(self._ref);
+            Encryptable::new(encryptable as *mut CBLEncryptable)
+        }
     }
 
     pub fn iter(&self) -> DictIterator<'f> {

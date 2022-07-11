@@ -19,6 +19,7 @@ extern crate couchbase_lite;
 extern crate lazy_static;
 
 use self::couchbase_lite::*;
+use field_encryption::Encryptable;
 use lazy_static::lazy_static;
 
 use std::collections::HashMap;
@@ -261,5 +262,73 @@ fn conflict_resolver() {
 
         // Check DB 2 version is in DB 1
         assert!(utils::check_callback_with_wait(|| local_db1.get_document("foo").unwrap().properties().get("i").as_i64_or_0() == i2, None));
+    });
+}
+
+fn encryptor(
+    _document_id: Option<String>,
+    _properties: Dict,
+    _key_path: Option<String>,
+    input: Option<Vec<u8>>,
+    _algorithm: Option<String>,
+    _kid: Option<String>,
+    _error: &Error
+) -> Vec<u8> {
+    input.map(|v| v.iter().map(|u| u ^ 48).collect()).unwrap_or(vec!())
+}
+fn decryptor(
+    _document_id: Option<String>,
+    _properties: Dict,
+    _key_path: Option<String>,
+    input: Option<Vec<u8>>,
+    _algorithm: Option<String>,
+    _kid: Option<String>,
+    _error: &Error
+) -> Vec<u8> {
+    input.map(|v| v.iter().map(|u| u ^ 48).collect()).unwrap_or(vec!())
+}
+
+#[test]
+fn encryption_decryption() {
+    let config1 = utils::ReplicationTestConfiguration {
+        property_encryptor: Some(encryptor),
+        property_decryptor: Some(decryptor),
+        ..Default::default()
+    };
+    let config2 = utils::ReplicationTestConfiguration {
+        property_encryptor: Some(encryptor),
+        property_decryptor: Some(decryptor),
+        ..Default::default()
+    };
+
+    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
+        // Save doc 'foo' with an encryptable property
+        {
+            let mut doc_db1 = Document::new_with_id("foo");
+            let mut props = doc_db1.mutable_properties();
+            props.at("i").put_i64(1234);
+            props.at("s").put_encrypt(&Encryptable::create_with_string("test_encryption".to_string()));
+            local_db1.save_document(&mut doc_db1, ConcurrencyControl::FailOnConflict).expect("save");
+        }
+
+        // Check foo is replicated with data encrypted in central
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+        {
+            let doc_central = central_db.get_document("foo").unwrap();
+            let dict = doc_central.properties();
+            assert!(dict.to_keys_hash_set().get("encrypted$s").is_some());
+        }
+
+        // Check foo is replicated with data decrypted in DB 2
+        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
+        {
+            let doc_db2 = local_db2.get_document("foo").unwrap();
+            let dict = doc_db2.properties();
+            let value = dict.get("s");
+            assert!(value.is_encryptable());
+            let encryptable = value.get_encryptable_value();
+            assert!(encryptable.get_value().as_string() == Some("test_encryption"));
+            drop(encryptable);
+        }
     });
 }

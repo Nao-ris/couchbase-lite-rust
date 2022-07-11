@@ -18,6 +18,7 @@
 #![allow(non_upper_case_globals)]
 
 use slice::as_slice;
+use slice::bytes_as_slice;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -266,11 +267,11 @@ pub type PropertyEncryptor = fn(
     document_id: Option<String>,
     properties: Dict,
     key_path: Option<String>,
-    input: Option<String>,
+    input: Option<Vec<u8>>,
     algorithm: Option<String>,
     kid: Option<String>,
     error: &Error
-) -> String;
+) -> Vec<u8>;
 #[no_mangle]
 pub extern "C" fn c_property_encryptor(
     context: *mut ::std::os::raw::c_void,
@@ -293,13 +294,13 @@ pub extern "C" fn c_property_encryptor(
                     document_id.to_string(),
                     Dict::wrap(properties, &properties),
                     key_path.to_string(),
-                    input.to_string(),
+                    input.to_vec(),
                     algorithm.as_ref().and_then(|s| s.to_string()),
                     kid.as_ref().and_then(|s| s.to_string()),
                     &error,
                 )
             })
-            .map(|s| FLSlice_Copy(as_slice(&s)))
+            .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])))
             .unwrap_or(FLSliceResult_New(0));
 
         if !cbl_error.is_null() {
@@ -317,11 +318,11 @@ pub type PropertyDecryptor = fn(
     document_id: Option<String>,
     properties: Dict,
     key_path: Option<String>,
-    input: Option<String>,
+    input: Option<Vec<u8>>,
     algorithm: Option<String>,
     kid: Option<String>,
     error: &Error
-) -> String;
+) -> Vec<u8>;
 #[no_mangle]
 pub extern "C" fn c_property_decryptor(
     context: *mut ::std::os::raw::c_void,
@@ -344,13 +345,13 @@ pub extern "C" fn c_property_decryptor(
                     document_id.to_string(),
                     Dict::wrap(properties, &properties),
                     key_path.to_string(),
-                    input.to_string(),
+                    input.to_vec(),
                     algorithm.to_string(),
                     kid.to_string(),
                     &error,
                 )
             })
-            .map(|s| FLSlice_Copy(as_slice(&s)))
+            .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])))
             .unwrap_or(FLSliceResult_New(0));
 
         if !cbl_error.is_null() {
@@ -479,8 +480,8 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
                 pullFilter: (*context).pull_filter.and(Some(c_replication_pull_filter)),
                 conflictResolver: (*context).conflict_resolver.and(Some(c_replication_conflict_resolver)),
                 context: std::mem::transmute(context),
-                propertyEncryptor: (*context).push_filter.and(Some(c_property_encryptor)),
-                propertyDecryptor: (*context).push_filter.and(Some(c_property_decryptor)),
+                propertyEncryptor: (*context).property_encryptor.and(Some(c_property_encryptor)),
+                propertyDecryptor: (*context).property_decryptor.and(Some(c_property_decryptor)),
             }
         }
     }
