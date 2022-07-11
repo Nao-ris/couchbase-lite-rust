@@ -234,14 +234,14 @@ unsafe extern "C" fn c_replication_conflict_resolver(
     let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
     let doc_id = document_id.to_string().unwrap_or("".to_string());
-    let local_document = if local_document.is_null() {
+    let local_document = if !local_document.is_null() {
         Some(Document {
             _ref: retain(local_document as *mut CBLDocument),
         })
     } else {
         None
     };
-    let remote_document = if remote_document.is_null() {
+    let remote_document = if !remote_document.is_null() {
         Some(Document {
             _ref: retain(remote_document as *mut CBLDocument),
         })

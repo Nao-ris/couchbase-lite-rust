@@ -16,10 +16,13 @@
 //
 
 extern crate couchbase_lite;
+extern crate lazy_static;
 
 use self::couchbase_lite::*;
+use lazy_static::lazy_static;
 
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 pub mod utils;
 
@@ -115,7 +118,7 @@ fn pull_type_not_pushing() {
 #[test]
 fn push_type_not_pulling() {
     let config1 = Default::default();
-    let config2: utils::ReplicationTestConfiguration = utils::ReplicationTestConfiguration {
+    let config2 = utils::ReplicationTestConfiguration {
         replicator_type: ReplicatorType::Push,
         ..Default::default()
     };
@@ -183,7 +186,7 @@ fn push_and_pull_filter() {
         push_filter: Some(|document, _is_deleted, _is_access_removed| document.id() == "foo" || document.id() == "foo2"),
         ..Default::default()
     };
-    let config2: utils::ReplicationTestConfiguration = utils::ReplicationTestConfiguration {
+    let config2 = utils::ReplicationTestConfiguration {
         pull_filter: Some(|document, _is_deleted, _is_access_removed| document.id() == "foo2" || document.id() == "foo3"),
         ..Default::default()
     };
@@ -202,5 +205,61 @@ fn push_and_pull_filter() {
         // Check only foo2' were replicated to DB 2
         assert!(!utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
         assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo2").is_ok(), None));
+    });
+}
+
+lazy_static! {
+    static ref CONFLICT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+}
+
+#[test]
+fn conflict_resolver() {
+    utils::set_static(&CONFLICT_DETECTED, false);
+
+    let config1 = utils::ReplicationTestConfiguration {
+        conflict_resolver: Some(|_document_id, _local_document, remote_document| {
+            utils::set_static(&CONFLICT_DETECTED, true);
+            remote_document
+        }),
+        ..Default::default()
+    };
+    let config2: utils::ReplicationTestConfiguration = Default::default();
+
+    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, repl1, _repl2| {
+        let i = 1234;
+        let i1 = 1;
+        let i2 = 2;
+
+        // Save doc 'foo'
+        utils::add_doc(local_db1, "foo", i, "Hello World!");
+
+        // Check 'foo' is replicated to central and DB 2
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
+
+        // Stop replication on DB 1
+        repl1.stop();
+
+        // Modify 'foo' in DB 1
+        let mut foo = local_db1.get_document("foo").unwrap();
+        foo.mutable_properties().at("i").put_i64(i1);
+        local_db1.save_document(&mut foo, ConcurrencyControl::FailOnConflict).expect("save");
+
+        // Modify 'foo' in DB 2
+        let mut foo = local_db2.get_document("foo").unwrap();
+        foo.mutable_properties().at("i").put_i64(i2);
+        local_db2.save_document(&mut foo, ConcurrencyControl::FailOnConflict).expect("save");
+
+        // Check DB 2 version is in central
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").unwrap().properties().get("i").as_i64_or_0() == i2, None));
+
+        // Restart DB 1 replication
+        repl1.start(false);
+
+        // Check conflict was detected
+        assert!(utils::check_static_with_wait(&CONFLICT_DETECTED, true, None));
+
+        // Check DB 2 version is in DB 1
+        assert!(utils::check_callback_with_wait(|| local_db1.get_document("foo").unwrap().properties().get("i").as_i64_or_0() == i2, None));
     });
 }
