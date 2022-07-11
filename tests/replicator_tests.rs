@@ -146,3 +146,31 @@ fn push_type_not_pulling() {
         assert!(!utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
     });
 }
+
+#[test]
+fn continuous() {
+    let config1 = utils::ReplicationTestConfiguration {
+        continuous: false,
+        ..Default::default()
+    };
+    let config2: utils::ReplicationTestConfiguration = Default::default();
+
+    utils::with_three_dbs(config1, config2, |local_db1, _local_db2, central_db, repl1, _repl2| {
+        // Save doc
+        let mut doc = Document::new_with_id("foo");
+        let mut props = doc.mutable_properties();
+        props.at("i").put_i64(1234);
+        props.at("s").put_string("Hello World!");
+
+        local_db1.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+
+        // Check the replication process is not running automatically
+        assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+
+        // Manually trigger the replication
+        repl1.start(false);
+
+        // Check the replication was successful
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+    });
+}

@@ -607,12 +607,14 @@ impl From<u8> for ReplicatorActivityLevel {
     replication progresses. The value is very approximate and may bounce around during replication;
     making it more accurate would require slowing down the replicator and incurring more load on the
     server. It's fine to use in a progress bar, though. */
+#[derive(Debug)]
 pub struct ReplicatorProgress {
     pub fraction_complete: f32,     // Very-approximate completion, from 0.0 to 1.0
     pub document_count:    u64      // Number of documents transferred so far
 }
 
 /** A replicator's current status. */
+#[derive(Debug)]
 pub struct ReplicatorStatus {
     pub activity: ReplicatorActivityLevel,  // Current state
     pub progress: ReplicatorProgress,       // Approximate fraction complete
