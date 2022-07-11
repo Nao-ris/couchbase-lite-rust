@@ -169,7 +169,7 @@ pub struct BlobWriter<'d> {
 impl<'d> BlobWriter<'d> {
     pub fn new(db: &'d mut Database) -> Result<BlobWriter<'d>> {
         unsafe {
-            let db_ref = db._ref;
+            let db_ref = db.get_ref();
             check_ptr(|err| CBLBlobWriter_Create(db_ref, err),
                       move |stream| BlobWriter{_stream_ref: stream, db: PhantomData})
         }

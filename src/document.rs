@@ -21,8 +21,9 @@ use super::c_api::*;
 
 
 /** An in-memory copy of a document. */
+#[derive(Debug)]
 pub struct Document {
-    _ref: *mut CBLDocument,
+    pub _ref: *mut CBLDocument,
     has_ownership: bool,
 }
 
@@ -73,7 +74,7 @@ impl Database {
             // we always get a mutable CBLDocument,
             // since Rust doesn't let us have MutableDocument subclass.
             let mut error = CBLError::default();
-            let doc = CBLDatabase_GetMutableDocument(self._ref, as_slice(id), &mut error);
+            let doc = CBLDatabase_GetMutableDocument(self.get_ref(), as_slice(id), &mut error);
             if doc.is_null() {
                 if error.code != 0 {
                     return failure(error);
@@ -81,7 +82,7 @@ impl Database {
                     return Err(Error::cbl_error(CouchbaseLiteError::NotFound));
                 }
             }
-            return Ok(Document{_ref: doc, has_ownership: true});
+            return Ok(Document { _ref: doc , has_ownership: true});
         }
     }
 
@@ -98,7 +99,7 @@ impl Database {
         let c_concurrency = concurrency as u8;
         unsafe {
             return check_bool(|error| CBLDatabase_SaveDocumentWithConcurrencyControl(
-                                            self._ref, doc._ref, c_concurrency, error))
+                                            self.get_ref(), doc._ref, c_concurrency, error))
         }
     }
 
@@ -135,7 +136,7 @@ impl Database {
 
     pub fn purge_document_by_id(&mut self, id: &str) -> Result<()> {
         unsafe {
-            return check_bool(|error| CBLDatabase_PurgeDocumentByID(self._ref, as_slice(id), error));
+            return check_bool(|error| CBLDatabase_PurgeDocumentByID(self.get_ref(), as_slice(id), error));
         }
     }
 
@@ -145,7 +146,7 @@ impl Database {
     pub fn document_expiration(&self, doc_id: &str) -> Result<Option<Timestamp>> {
         unsafe {
             let mut error = CBLError::default();
-            let exp = CBLDatabase_GetDocumentExpiration(self._ref, as_slice(doc_id), &mut error);
+            let exp = CBLDatabase_GetDocumentExpiration(self.get_ref(), as_slice(doc_id), &mut error);
             if exp < 0 {
                 return failure(error);
             } else if exp == 0 {
@@ -163,7 +164,7 @@ impl Database {
             _ => 0,
         };
         unsafe {
-            return check_bool(|error| CBLDatabase_SetDocumentExpiration(self._ref, as_slice(doc_id), exp, error));
+            return check_bool(|error| CBLDatabase_SetDocumentExpiration(self.get_ref(), as_slice(doc_id), exp, error));
         }
     }
 
@@ -190,13 +191,16 @@ impl Document {
     /** Creates a new, empty document in memory, with an automatically generated unique ID.
         It will not be added to a database until saved. */
     pub fn new() -> Self {
-        unsafe { Document{_ref: CBLDocument_Create(), has_ownership: true} }
+        unsafe {
+            Document { _ref: CBLDocument_Create() , has_ownership: true}
+        }
     }
 
     /** Creates a new, empty document in memory, with the given ID.
         It will not be added to a database until saved. */
     pub fn new_with_id(id: &str) -> Self {
-        unsafe { Document{_ref: CBLDocument_CreateWithID(as_slice(id)), has_ownership: true} }
+        unsafe {
+            Document { _ref: CBLDocument_CreateWithID(as_slice(id)) , has_ownership: true} }
     }
 
     /** Returns the document's ID. */
@@ -269,6 +273,11 @@ impl Drop for Document {
 
 impl Clone for Document {
     fn clone(&self) -> Self {
-        unsafe { Document{_ref: retain(self._ref), has_ownership: true} }
+        unsafe {
+            Document{
+                _ref: retain(self._ref),
+                has_ownership: true
+            }
+        }
     }
 }

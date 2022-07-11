@@ -44,7 +44,7 @@ enum_from_primitive! {
 
 type ChangeListener = fn(db: &Database, doc_ids: Vec<String>);
 #[no_mangle]
-unsafe extern "C" fn c_change_listener(
+unsafe extern "C" fn c_database_change_listener(
     context: *mut ::std::os::raw::c_void,
     db: *const CBLDatabase,
     num_docs: ::std::os::raw::c_uint,
@@ -52,47 +52,48 @@ unsafe extern "C" fn c_change_listener(
 ) {
     let callback: ChangeListener = std::mem::transmute(context);
 
-    let database = Database {
-        _ref: db as *mut CBLDatabase,
-        has_ownership: false,
-    };
-    let mut vec_doc_ids = Vec::new();
-    for i in 0..num_docs {
-        if let Some(doc_id) = c_doc_ids.offset(i as isize).as_ref() {
-            if let Some(doc_id) = doc_id.to_string() {
-                vec_doc_ids.push(doc_id.to_string())
-            }
-        }
-    }
+    let database = Database::new(db as *mut CBLDatabase);
 
-    callback(&database, vec_doc_ids);
+    let doc_ids = std::slice::from_raw_parts(c_doc_ids, num_docs as usize)
+        .iter()
+        .filter_map(|doc_id| doc_id.to_string())
+        .collect();
+
+    callback(&database, doc_ids);
 }
 
 type BufferNotifications = fn(db: &Database);
 #[no_mangle]
-unsafe extern "C" fn c_buffer_notifications(
+unsafe extern "C" fn c_database_buffer_notifications(
     context: *mut ::std::os::raw::c_void,
     db: *mut CBLDatabase
 ) {
     let callback: BufferNotifications = std::mem::transmute(context);
 
-    let database = Database {
-        _ref: db as *mut CBLDatabase,
-        has_ownership: false,
-    };
+    let database = Database::new(db as *mut CBLDatabase);
 
     callback(&database);
 }
 
 /** A connection to an open database. */
+#[derive(Debug, PartialEq, Eq)]
 pub struct Database {
-    pub(crate) _ref: *mut CBLDatabase,
-    pub(crate) has_ownership: bool,
+    _ref: *mut CBLDatabase,
 }
 
 impl Database {
 
     //////// CONSTRUCTORS:
+
+    pub fn new(_ref: *mut CBLDatabase) -> Database {
+        Database { _ref: unsafe { retain(_ref) } }
+    }
+    pub fn new_no_retain(_ref: *mut CBLDatabase) -> Database {
+        Database { _ref: _ref }
+    }
+    pub(crate) fn get_ref(&self) -> *mut CBLDatabase {
+        self._ref
+    }
 
     /** Opens a database, or creates it if it doesn't exist yet, returning a new `Database`
         instance.
@@ -121,10 +122,7 @@ impl Database {
         if db_ref.is_null() {
             return failure(err);
         }
-        return Ok(Database{
-            _ref: db_ref,
-            has_ownership: true,
-        });
+        return Ok(Database{ _ref: db_ref });
     }
 
 
@@ -235,7 +233,7 @@ impl Database {
             let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
 
             ListenerToken {
-                _ref: CBLDatabase_AddChangeListener(self._ref, Some(c_change_listener), callback)
+                _ref: CBLDatabase_AddChangeListener(self._ref, Some(c_database_change_listener), callback)
             }
         }
     }
@@ -248,7 +246,7 @@ impl Database {
         unsafe {
             let callback: *mut ::std::os::raw::c_void = std::mem::transmute(callback);
 
-            CBLDatabase_BufferNotifications(self._ref, Some(c_buffer_notifications), callback);
+            CBLDatabase_BufferNotifications(self._ref, Some(c_database_buffer_notifications), callback);
         }
     }
 
@@ -265,9 +263,17 @@ impl Database {
 
 impl Drop for Database {
     fn drop(&mut self) {
-        if self.has_ownership {
-            unsafe {
-                release(self._ref)
+        unsafe {
+            release(self._ref)
+        }
+    }
+}
+
+impl Clone for Database {
+    fn clone(&self) -> Self {
+        unsafe {
+            return Database {
+                _ref: retain(self._ref)
             }
         }
     }

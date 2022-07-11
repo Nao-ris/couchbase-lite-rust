@@ -21,6 +21,7 @@ use super::error::*;
 use super::c_api::*;
 
 use enum_primitive::FromPrimitive;
+use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
@@ -388,6 +389,12 @@ impl<'f> Dict<'f> {
             FLDictIterator_Begin(self._ref, i.as_mut_ptr());
             return DictIterator{_innards: i.assume_init(), _owner: self._owner};
         }
+    }
+
+    pub fn to_keys_hash_set(&self) -> HashSet<String> {
+        self.into_iter()
+            .map(|tuple| tuple.0.to_string())
+            .collect::<HashSet<String>>()
     }
 }
 

@@ -251,6 +251,14 @@ pub(crate) fn check_failure(status: bool, err: &CBLError) -> Result<()> {
     }
 }
 
+pub(crate) fn check_error(err: &CBLError) -> Result<()> {
+    if err.domain == 0 || err.code == 0 {
+        Ok(())
+    } else {
+        Err(Error::new(err))
+    }
+}
+
 pub(crate) fn check_bool<F>(func: F) -> Result<()>
     where F: Fn(*mut CBLError)->bool
 {

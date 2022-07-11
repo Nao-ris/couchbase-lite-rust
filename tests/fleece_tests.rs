@@ -109,6 +109,22 @@ fn borrow_check() {
 */
 
 #[test]
+fn dict_to_hash_set() {
+    let mut mut_dict = MutableDict::new();
+
+    mut_dict.at("id1").put_bool(true);
+    mut_dict.at("id2").put_bool(true);
+
+    let dict = mut_dict.as_dict();
+
+    let hash_set = dict.to_keys_hash_set();
+
+    assert_eq!(hash_set.len(), 2);
+    assert_eq!(hash_set.get("id1"), Some(&"id1".to_string()));
+    assert_eq!(hash_set.get("id2"), Some(&"id2".to_string()));
+}
+
+#[test]
 fn mutable_dict() {
     let mut dict = MutableDict::new();
     assert_eq!(dict.count(), 0);
