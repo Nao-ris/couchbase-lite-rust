@@ -3,20 +3,24 @@ use super::slice::*;
 use super::*;
 
 pub struct Encryptable {
-    pub _ref: *mut CBLEncryptable,
+    _ref: *mut CBLEncryptable,
 }
 
 impl From<*mut CBLEncryptable> for Encryptable {
     fn from(_ref: *mut CBLEncryptable) -> Self {
-        Encryptable { _ref: unsafe { retain(_ref) } }
+        Self::retain(_ref)
     }
 }
 
 impl Encryptable {
-    pub fn new(_ref: *mut CBLEncryptable) -> Self {
+    pub fn retain(_ref: *mut CBLEncryptable) -> Self {
         Encryptable {
             _ref: unsafe { retain(_ref) }
         }
+    }
+
+    pub(crate) fn get_ref(&self) -> *mut CBLEncryptable {
+        self._ref
     }
 
     pub fn create_with_null() -> Encryptable {
@@ -45,14 +49,9 @@ impl Encryptable {
 
     pub fn create_with_string(value: String) -> Encryptable {
         unsafe {
-            let stri = value.as_str();
-            println!("Antoine building: {:?}", stri);
-            let slice = as_slice(stri);
-            println!("Antoine building: {:?}", slice.to_string());
+            let slice = as_slice(value.as_str());
             let copy_slice = FLSlice_Copy(slice);
-            //println!("Antoine building: {:?}", copy_slice.to_string());
             let final_slice = copy_slice.as_slice();
-            println!("Antoine building: {:?}", final_slice.to_string());
             CBLEncryptable_CreateWithString(final_slice).into()
         }
     }
@@ -75,12 +74,6 @@ impl Encryptable {
 
     pub fn get_properties(&self) -> Dict {
         unsafe { Dict::wrap(CBLEncryptable_Properties(self._ref), self) }
-    }
-
-
-    // Helper for testing purposes
-    pub fn as_string(&self) -> Option<&str> {
-        self.get_value().as_string()
     }
 }
 

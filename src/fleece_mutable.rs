@@ -20,7 +20,7 @@ use super::slice::*;
 use super::c_api::*;
 use super::fleece::*;
 
-use field_encryption::Encryptable;
+use encryptable::Encryptable;
 
 use std::collections::HashMap;
 use std::fmt;
@@ -212,7 +212,7 @@ impl MutableDict {
 
     pub fn set_encryptable_value(dict: MutableDict, key: String, encryptable: Encryptable) {
         unsafe {
-            FLSlot_SetEncryptableValue(FLMutableDict_Set(dict._ref, as_slice(&key)), encryptable._ref);
+            FLSlot_SetEncryptableValue(FLMutableDict_Set(dict._ref, as_slice(&key)), encryptable.get_ref());
         }
     }
 
@@ -335,7 +335,7 @@ impl<'s> Slot<'s> {
         unsafe { FLSlot_SetValue(self._ref, value._fleece_ref()) }
     }
 
-    pub fn put_encrypt(self, value: &field_encryption::Encryptable) {
-        unsafe { FLSlot_SetEncryptableValue(self._ref, value._ref) }
+    pub fn put_encrypt(self, value: &encryptable::Encryptable) {
+        unsafe { FLSlot_SetEncryptableValue(self._ref, value.get_ref()) }
     }
 }

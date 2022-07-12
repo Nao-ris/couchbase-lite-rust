@@ -19,7 +19,7 @@ extern crate couchbase_lite;
 extern crate lazy_static;
 
 use self::couchbase_lite::*;
-use field_encryption::Encryptable;
+use encryptable::Encryptable;
 use lazy_static::lazy_static;
 
 use std::collections::HashMap;
@@ -107,12 +107,19 @@ fn pull_type_not_pushing() {
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
 
-    utils::with_three_dbs(config1, config2, |local_db1, _local_db2, central_db, _repl1, _repl2| {
-        // Save doc
+    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
+        // Save doc in DB 1
         utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
         // Check the replication process is not pushing to central
         assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+
+        // Save doc in DB 2
+        utils::add_doc(local_db2, "foo2", 1234, "Hello World!");
+
+        // Check 'foo2' is pulled in DB 1
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo2").is_ok(), None));
+        assert!(utils::check_callback_with_wait(|| local_db1.get_document("foo2").is_ok(), None));
     });
 }
 
@@ -125,7 +132,7 @@ fn push_type_not_pulling() {
     };
 
     utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
-        // Save doc
+        // Save doc in DB 1
         utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
         // Check if replication to central
@@ -133,6 +140,12 @@ fn push_type_not_pulling() {
 
         // Check the replication process is not pulling to DB 2
         assert!(!utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
+
+        // Save doc in DB 2
+        utils::add_doc(local_db2, "foo2", 1234, "Hello World!");
+
+        // Check 'foo2' is pushed in central
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo2").is_ok(), None));
     });
 }
 

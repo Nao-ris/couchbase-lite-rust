@@ -20,7 +20,7 @@ use super::slice::*;
 use super::error::*;
 use super::c_api::*;
 
-use field_encryption::Encryptable;
+use encryptable::Encryptable;
 
 use enum_primitive::FromPrimitive;
 use std::collections::HashSet;
@@ -212,7 +212,7 @@ impl<'f> Value<'f> {
     pub fn get_encryptable_value(&self) -> Encryptable {
         unsafe {
             let encryptable = FLDict_GetEncryptableValue(FLValue_AsDict(self._ref));
-            Encryptable::new(encryptable as *mut CBLEncryptable)
+            Encryptable::retain(encryptable as *mut CBLEncryptable)
         }
     }
 }
@@ -398,7 +398,7 @@ impl<'f> Dict<'f> {
     pub fn get_encryptable_value(&self) -> Encryptable {
         unsafe {
             let encryptable = FLDict_GetEncryptableValue(self._ref);
-            Encryptable::new(encryptable as *mut CBLEncryptable)
+            Encryptable::retain(encryptable as *mut CBLEncryptable)
         }
     }
 

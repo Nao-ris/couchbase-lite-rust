@@ -52,7 +52,7 @@ unsafe extern "C" fn c_database_change_listener(
 ) {
     let callback: ChangeListener = std::mem::transmute(context);
 
-    let database = Database::wrap(db as *mut CBLDatabase);
+    let database = Database::retain(db as *mut CBLDatabase);
 
     let doc_ids = std::slice::from_raw_parts(c_doc_ids, num_docs as usize)
         .iter()
@@ -70,7 +70,7 @@ unsafe extern "C" fn c_database_buffer_notifications(
 ) {
     let callback: BufferNotifications = std::mem::transmute(context);
 
-    let database = Database::wrap(db as *mut CBLDatabase);
+    let database = Database::retain(db as *mut CBLDatabase);
 
     callback(&database);
 }
@@ -85,10 +85,10 @@ impl Database {
 
     //////// CONSTRUCTORS:
 
-    pub fn wrap(_ref: *mut CBLDatabase) -> Database {
+    pub(crate) fn retain(_ref: *mut CBLDatabase) -> Database {
         Database { _ref: unsafe { retain(_ref) } }
     }
-    pub fn wrap_no_retain(_ref: *mut CBLDatabase) -> Database {
+    pub(crate) fn wrap(_ref: *mut CBLDatabase) -> Database {
         Database { _ref: _ref }
     }
     pub(crate) fn get_ref(&self) -> *mut CBLDatabase {

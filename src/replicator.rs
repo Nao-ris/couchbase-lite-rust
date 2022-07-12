@@ -235,19 +235,19 @@ unsafe extern "C" fn c_replication_conflict_resolver(
     let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
     let doc_id = document_id.to_string().unwrap_or("".to_string());
-    let local_document = if !local_document.is_null() {
+    let local_document = if local_document.is_null() {
+        None
+    } else {
         Some(Document {
             _ref: retain(local_document as *mut CBLDocument),
         })
-    } else {
-        None
     };
-    let remote_document = if !remote_document.is_null() {
+    let remote_document = if remote_document.is_null() {
+        None
+    } else {
         Some(Document {
             _ref: retain(remote_document as *mut CBLDocument),
         })
-    } else {
-        None
     };
 
     if let Some(callback) = (*repl_conf_context).conflict_resolver {
@@ -416,7 +416,7 @@ impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
             let context: *const ReplicationConfigurationContext = std::mem::transmute(config.context);
 
             ReplicatorConfiguration {
-                database: Database::wrap_no_retain(config.database),
+                database: Database::wrap(config.database),
                 endpoint: Endpoint { _ref: config.endpoint },
                 replicator_type: config.replicatorType.into(),
                 continuous: config.continuous,
