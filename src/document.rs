@@ -89,11 +89,22 @@ impl Database {
     }
 
     /** Saves a new or modified document to the database.
+    If a newer revision has been saved since \p doc was loaded, it will be overwritten by
+    this one. This can lead to data loss! To avoid this, call
+    `save_document_with_concurency_control` or
+    `save_document_resolving` instead. */
+    pub fn save_document(&mut self, doc: &mut Document) -> Result<()> {
+        unsafe {
+            return check_bool(|error| CBLDatabase_SaveDocument(self.get_ref(), doc._ref, error));
+        }
+    }
+
+    /** Saves a new or modified document to the database.
     If a conflicting revision has been saved since `doc` was loaded, the `concurrency`
     parameter specifies whether the save should fail, or the conflicting revision should
     be overwritten with the revision being saved.
     If you need finer-grained control, call `save_document_resolving` instead. */
-    pub fn save_document(
+    pub fn save_document_with_concurency_control(
         &mut self,
         doc: &mut Document,
         concurrency: ConcurrencyControl,
@@ -137,7 +148,14 @@ impl Database {
     }
 
     /** Deletes a document from the database. Deletions are replicated. */
-    pub fn delete_document(
+    pub fn delete_document(&mut self, doc: &Document) -> Result<()> {
+        unsafe {
+            return check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc._ref, error));
+        }
+    }
+
+    /** Deletes a document from the database. Deletions are replicated. */
+    pub fn delete_document_with_concurency_control(
         &mut self,
         doc: &Document,
         concurrency: ConcurrencyControl,
