@@ -34,9 +34,11 @@ fn document_revision_id() {
     utils::with_db(|db| {
         let mut document = Document::new();
         assert_eq!(document.revision_id(), None);
+
         db.save_document(&mut document, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
         assert!(document.revision_id().is_some());
+
         let first_revision_id = String::from(document.revision_id().unwrap());
         db.save_document(&mut document, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
@@ -53,6 +55,7 @@ fn document_sequence() {
         let mut document_2 = Document::new();
         assert_eq!(document_1.sequence(), 0);
         assert_eq!(document_2.sequence(), 0);
+
         db.save_document(&mut document_1, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
         db.save_document(&mut document_2, ConcurrencyControl::FailOnConflict)
@@ -225,7 +228,8 @@ fn database_add_document_change_listener() {
         db.save_document(&mut document, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
         let listener_token = db.add_document_change_listener(&document, |_, document_id| {
-            if document_id == "foo" {
+            if let Some(id) = document_id {
+                assert_eq!(id, "foo");
                 utils::set_static(&DOCUMENT_DETECTED, true);
             }
         });
@@ -237,6 +241,17 @@ fn database_add_document_change_listener() {
             true,
             None
         ));
+
+        utils::set_static(&DOCUMENT_DETECTED, false);
+        let mut document = Document::new_with_id("bar");
+        db.save_document(&mut document, ConcurrencyControl::FailOnConflict)
+            .expect("save_document");
+        assert!(utils::check_static_with_wait(
+            &DOCUMENT_DETECTED,
+            false,
+            None
+        ));
+
         drop(listener_token);
     });
 }

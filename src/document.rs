@@ -52,7 +52,7 @@ unsafe extern "C" fn c_conflict_handler(
 
 /**  A document change listener lets you detect changes made to a specific document after they
 are persisted to the database. */
-type ChangeListener = fn(&Database, &str);
+type ChangeListener = fn(&Database, Option<String>);
 #[no_mangle]
 unsafe extern "C" fn c_document_change_listener(
     context: *mut ::std::os::raw::c_void,
@@ -63,7 +63,7 @@ unsafe extern "C" fn c_document_change_listener(
 
     let database = Database::new(db as *mut CBLDatabase);
 
-    callback(&database, c_doc_id.to_string().unwrap().as_ref());
+    callback(&database, c_doc_id.to_string());
 }
 
 //////// DATABASE'S DOCUMENT API:
