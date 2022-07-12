@@ -154,6 +154,7 @@ impl Database {
         }
     }
 
+    /** Deletes a document from the database. Deletions are replicated. */
     pub fn delete_document_with_concurency_control(
         &mut self,
         doc: &Document,

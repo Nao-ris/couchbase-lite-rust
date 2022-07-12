@@ -185,7 +185,8 @@ fn database_delete_document() {
         let mut document = Document::new_with_id("foo");
         db.save_document_with_concurency_control(&mut document, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
-        db.delete_document(&document).expect("delete_document");
+        db.delete_document_with_concurency_control(&document, ConcurrencyControl::FailOnConflict)
+            .expect("delete_document");
         let document = db.get_document("foo");
         // FIXME delete doesn't seem to work just like that (maybe need for replication)
         assert!(document.is_err());
@@ -264,7 +265,7 @@ fn database_add_document_change_listener() {
 
         utils::set_static(&DOCUMENT_DETECTED, false);
         let mut document = Document::new_with_id("bar");
-        db.save_document(&mut document, ConcurrencyControl::FailOnConflict)
+        db.save_document_with_concurency_control(&mut document, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
         assert!(utils::check_static_with_wait(
             &DOCUMENT_DETECTED,
