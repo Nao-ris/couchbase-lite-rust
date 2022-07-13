@@ -188,9 +188,7 @@ unsafe extern "C" fn c_replication_push_filter(
 ) -> bool {
     let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
-    let document = Document {
-        _ref: retain(document as *mut CBLDocument),
-    };
+    let document = Document::wrap(document as *mut CBLDocument);
 
     let (is_deleted, is_access_removed) = read_document_flags(flags);
 
@@ -205,9 +203,7 @@ unsafe extern "C" fn c_replication_pull_filter(
 ) -> bool {
     let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
-    let document = Document {
-        _ref: retain(document as *mut CBLDocument),
-    };
+    let document = Document::wrap(document as *mut CBLDocument);
 
     let (is_deleted, is_access_removed) = read_document_flags(flags);
 
@@ -238,21 +234,17 @@ unsafe extern "C" fn c_replication_conflict_resolver(
     let local_document = if local_document.is_null() {
         None
     } else {
-        Some(Document {
-            _ref: retain(local_document as *mut CBLDocument),
-        })
+        Some(Document::retain(local_document as *mut CBLDocument))
     };
     let remote_document = if remote_document.is_null() {
         None
     } else {
-        Some(Document {
-            _ref: retain(remote_document as *mut CBLDocument),
-        })
+        Some(Document::retain(remote_document as *mut CBLDocument))
     };
 
     if let Some(callback) = (*repl_conf_context).conflict_resolver {
         callback(&doc_id, local_document, remote_document)
-            .map(|d| d._ref as *const CBLDocument)
+            .map(|d| d.get_ref() as *const CBLDocument)
             .unwrap_or(ptr::null())
     } else {
         ptr::null()

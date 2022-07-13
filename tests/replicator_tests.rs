@@ -257,12 +257,12 @@ fn conflict_resolver() {
         // Modify 'foo' in DB 1
         let mut foo = local_db1.get_document("foo").unwrap();
         foo.mutable_properties().at("i").put_i64(i1);
-        local_db1.save_document(&mut foo, ConcurrencyControl::FailOnConflict).expect("save");
+        local_db1.save_document_with_concurency_control(&mut foo, ConcurrencyControl::FailOnConflict).expect("save");
 
         // Modify 'foo' in DB 2
         let mut foo = local_db2.get_document("foo").unwrap();
         foo.mutable_properties().at("i").put_i64(i2);
-        local_db2.save_document(&mut foo, ConcurrencyControl::FailOnConflict).expect("save");
+        local_db2.save_document_with_concurency_control(&mut foo, ConcurrencyControl::FailOnConflict).expect("save");
 
         // Check DB 2 version is in central
         assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").unwrap().properties().get("i").as_i64_or_0() == i2, None));
@@ -321,7 +321,7 @@ fn encryption_decryption() {
             let mut props = doc_db1.mutable_properties();
             props.at("i").put_i64(1234);
             props.at("s").put_encrypt(&Encryptable::create_with_string("test_encryption".to_string()));
-            local_db1.save_document(&mut doc_db1, ConcurrencyControl::FailOnConflict).expect("save");
+            local_db1.save_document_with_concurency_control(&mut doc_db1, ConcurrencyControl::FailOnConflict).expect("save");
         }
 
         // Check foo is replicated with data encrypted in central
