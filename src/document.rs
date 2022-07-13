@@ -61,7 +61,7 @@ unsafe extern "C" fn c_document_change_listener(
 ) {
     let callback: ChangeListener = std::mem::transmute(context);
 
-    let database = Database::new(db as *mut CBLDatabase);
+    let database = Database::retain(db as *mut CBLDatabase);
 
     callback(&database, c_doc_id.to_string());
 }

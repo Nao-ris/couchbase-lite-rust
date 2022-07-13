@@ -188,7 +188,7 @@ unsafe extern "C" fn c_replication_push_filter(
 ) -> bool {
     let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
-    let document = Document::wrap(document as *mut CBLDocument);
+    let document = Document::retain(document as *mut CBLDocument);
 
     let (is_deleted, is_access_removed) = read_document_flags(flags);
 
@@ -203,7 +203,7 @@ unsafe extern "C" fn c_replication_pull_filter(
 ) -> bool {
     let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
-    let document = Document::wrap(document as *mut CBLDocument);
+    let document = Document::retain(document as *mut CBLDocument);
 
     let (is_deleted, is_access_removed) = read_document_flags(flags);
 

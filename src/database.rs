@@ -122,7 +122,7 @@ impl Database {
         if db_ref.is_null() {
             return failure(err);
         }
-        return Ok(Database{ _ref: db_ref });
+        return Ok(Database::wrap(db_ref));
     }
 
 
@@ -271,10 +271,6 @@ impl Drop for Database {
 
 impl Clone for Database {
     fn clone(&self) -> Self {
-        unsafe {
-            return Database {
-                _ref: retain(self._ref)
-            }
-        }
+        Database::retain(self._ref)
     }
 }
