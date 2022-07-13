@@ -336,10 +336,6 @@ impl Drop for Document {
 
 impl Clone for Document {
     fn clone(&self) -> Self {
-        unsafe {
-            Document {
-                _ref: retain(self._ref),
-            }
-        }
+        Document::retain(self._ref)
     }
 }

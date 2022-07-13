@@ -120,7 +120,7 @@ fn basic_local_replication() {
         props.at("i").put_i64(1234);
         props.at("s").put_string("Hello World!");
 
-        local_db1.save_document(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+        local_db1.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
 
         // Check if replication
         let ten_seconds = time::Duration::from_secs(10);

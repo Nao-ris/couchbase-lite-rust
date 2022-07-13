@@ -40,7 +40,7 @@ fn in_transaction() {
     utils::with_db(|db| {
         let result = db.in_transaction(|db| {
             let mut doc = Document::new_with_id("document");
-            db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
             Ok("document".to_string())
         });
 
@@ -49,7 +49,7 @@ fn in_transaction() {
 
         let result = db.in_transaction(|db| -> Result<String> {
             let mut doc = Document::new_with_id("document_error");
-            db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
             Err(couchbase_lite::Error::default())
         });
 
@@ -77,7 +77,7 @@ fn add_listener() {
         });
 
         let mut doc = Document::new_with_id("document");
-        db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
 
         assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
 
@@ -102,7 +102,7 @@ fn buffer_notifications() {
         });
 
         let mut doc = Document::new_with_id("document");
-        db.save_document(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
 
         assert!(!utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
         assert!(utils::check_static_with_wait(&BUFFER_NOTIFICATIONS, true, None));
