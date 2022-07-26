@@ -29,8 +29,8 @@ pub struct DatabaseConfiguration<'a> {
     pub encryption_key: *mut CBLEncryptionKey,
 }
 
-
 enum_from_primitive! {
+    /** Conflict-handling options when saving or deleting a document. */
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum MaintenanceType {
         Compact         = kCBLMaintenanceTypeCompact as isize,
@@ -41,7 +41,7 @@ enum_from_primitive! {
     }
 }
 
-
+/** A database change listener callback, invoked after one or more documents are changed on disk. */
 type ChangeListener = fn(db: &Database, doc_ids: Vec<String>);
 #[no_mangle]
 unsafe extern "C" fn c_database_change_listener(
@@ -62,6 +62,7 @@ unsafe extern "C" fn c_database_change_listener(
     callback(&database, doc_ids);
 }
 
+/** Callback indicating that the database (or an object belonging to it) is ready to call one or more listeners. */
 type BufferNotifications = fn(db: &Database);
 #[no_mangle]
 unsafe extern "C" fn c_database_buffer_notifications(
