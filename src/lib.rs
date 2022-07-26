@@ -69,7 +69,7 @@ impl Drop for ListenerToken {
 
 /** Returns the total number of Couchbase Lite objects. Useful for leak checking. */
 pub fn instance_count() -> usize {
-    unsafe { return CBL_InstanceCount() as usize }
+    unsafe { CBL_InstanceCount() as usize }
 }
 
 /** Logs the class and address of each Couchbase Lite object. Useful for leak checking.
@@ -81,7 +81,7 @@ pub fn dump_instances() {
 //////// REFCOUNT SUPPORT (INTERNAL)
 
 pub(crate) unsafe fn retain<T>(cbl_ref: *mut T) -> *mut T {
-    return CBL_Retain(cbl_ref as *mut CBLRefCounted) as *mut T;
+    CBL_Retain(cbl_ref as *mut CBLRefCounted) as *mut T
 }
 
 pub(crate) unsafe fn release<T>(cbl_ref: *mut T) {

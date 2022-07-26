@@ -406,8 +406,7 @@ fn encryptor(
     _error: &Error,
 ) -> Vec<u8> {
     input
-        .map(|v| v.iter().map(|u| u ^ 48).collect())
-        .unwrap_or(vec![])
+        .map(|v| v.iter().map(|u| u ^ 48).collect()).unwrap_or_default()
 }
 fn decryptor(
     _document_id: Option<String>,
@@ -419,8 +418,7 @@ fn decryptor(
     _error: &Error,
 ) -> Vec<u8> {
     input
-        .map(|v| v.iter().map(|u| u ^ 48).collect())
-        .unwrap_or(vec![])
+        .map(|v| v.iter().map(|u| u ^ 48).collect()).unwrap_or_default()
 }
 
 #[test]

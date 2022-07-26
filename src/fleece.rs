@@ -51,7 +51,7 @@ impl Fleece {
                 copied.release();
                 return Err(Error::fleece_error(FLError_kFLInvalidData));
             }
-            return Ok(Fleece { _ref: doc });
+            Ok(Fleece { _ref: doc })
         }
     }
 
@@ -62,7 +62,7 @@ impl Fleece {
             if doc.is_null() {
                 return Err(Error::fleece_error(error));
             }
-            return Ok(Fleece { _ref: doc });
+            Ok(Fleece { _ref: doc })
         }
     }
 
@@ -96,9 +96,9 @@ impl Drop for Fleece {
 impl Clone for Fleece {
     fn clone(&self) -> Self {
         unsafe {
-            return Fleece {
+            Fleece {
                 _ref: FLDoc_Retain(self._ref),
-            };
+            }
         }
     }
 }
@@ -106,7 +106,7 @@ impl Clone for Fleece {
 //////// VALUE
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Eq)]
     pub enum ValueType {
         Undefined = -1,  // Type of a NULL pointer, i.e. no such value, like JSON `undefined`
         Null = 0,        // Equivalent to a JSON 'null'
@@ -169,7 +169,7 @@ impl<'f> Value<'f> {
 
     pub fn get_type(&self) -> ValueType {
         unsafe {
-            return ValueType::from_i32(FLValue_GetType(self._ref)).unwrap();
+            ValueType::from_i32(FLValue_GetType(self._ref)).unwrap()
         }
     }
     pub fn is_type(&self, t: ValueType) -> bool {
@@ -244,7 +244,7 @@ impl<'f> Value<'f> {
             if t == 0 {
                 return None;
             }
-            return Some(Timestamp(t));
+            Some(Timestamp(t))
         }
     }
 
@@ -319,7 +319,7 @@ impl fmt::Debug for Value<'_> {
 
 impl fmt::Display for Value<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        return f.write_str(&self.to_json());
+        f.write_str(&self.to_json())
     }
 }
 
@@ -360,10 +360,10 @@ impl<'f> Array<'f> {
         unsafe {
             let mut i = MaybeUninit::<FLArrayIterator>::uninit();
             FLArrayIterator_Begin(self._ref, i.as_mut_ptr());
-            return ArrayIterator {
+            ArrayIterator {
                 _innards: i.assume_init(),
                 _owner: self._owner,
-            };
+            }
         }
     }
 }
@@ -458,10 +458,10 @@ impl<'f> Iterator for ArrayIterator<'f> {
                 return None;
             }
             FLArrayIterator_Next(&mut self._innards);
-            return Some(Value {
+            Some(Value {
                 _ref: val,
                 _owner: PhantomData,
-            });
+            })
         }
     }
 }
@@ -531,10 +531,10 @@ impl<'f> Dict<'f> {
         unsafe {
             let mut i = MaybeUninit::<FLDictIterator>::uninit();
             FLDictIterator_Begin(self._ref, i.as_mut_ptr());
-            return DictIterator {
+            DictIterator {
                 _innards: i.assume_init(),
                 _owner: self._owner,
-            };
+            }
         }
     }
 
@@ -606,9 +606,9 @@ pub struct DictKey {
 impl DictKey {
     pub fn new(key: &str) -> DictKey {
         unsafe {
-            return DictKey {
+            DictKey {
                 _innards: FLDictKey_Init(as_slice(key)),
-            };
+            }
         }
     }
 
@@ -643,13 +643,13 @@ impl<'a> Iterator for DictIterator<'a> {
                 .as_str()
                 .unwrap();
             FLDictIterator_Next(&mut self._innards);
-            return Some((
+            Some((
                 key,
                 Value {
                     _ref: val,
                     _owner: PhantomData,
                 },
-            ));
+            ))
         }
     }
 }

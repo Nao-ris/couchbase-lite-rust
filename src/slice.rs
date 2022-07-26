@@ -31,17 +31,17 @@ pub const NULL_SLICE: FLSlice = FLSlice {
 };
 
 pub fn as_slice(s: &str) -> FLSlice {
-    return FLSlice {
+    FLSlice {
         buf: s.as_ptr() as *const c_void,
         size: s.len() as u64,
-    };
+    }
 }
 
 pub fn bytes_as_slice(s: &[u8]) -> FLSlice {
-    return FLSlice {
+    FLSlice {
         buf: s.as_ptr() as *const c_void,
         size: s.len() as u64,
-    };
+    }
 }
 
 impl FLSlice {
@@ -98,10 +98,10 @@ impl std::ops::Not for FLSlice {
 
 impl FLSliceResult {
     pub fn as_slice(&self) -> FLSlice {
-        return FLSlice {
+        FLSlice {
             buf: self.buf,
             size: self.size,
-        };
+        }
     }
 
     // pub unsafe fn retain(&mut self) {
@@ -118,14 +118,14 @@ impl FLSliceResult {
     pub unsafe fn to_string(mut self) -> Option<String> {
         let str = self.as_slice().to_string();
         self.release();
-        return str;
+        str
     }
 
     // Consumes & releases self
     pub unsafe fn to_vec(mut self) -> Option<Vec<u8>> {
         let vec = self.as_slice().to_vec();
         self.release();
-        return vec;
+        vec
     }
 }
 

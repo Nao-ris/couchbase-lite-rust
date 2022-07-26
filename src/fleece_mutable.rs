@@ -63,7 +63,7 @@ impl MutableArray {
 
     pub(crate) unsafe fn adopt(array: FLMutableArray) -> MutableArray {
         FLValue_Retain(array as FLValue);
-        return MutableArray { _ref: array };
+        MutableArray { _ref: array }
     }
 
     pub fn is_changed(&self) -> bool {
@@ -129,9 +129,9 @@ impl FleeceReference for MutableArray {
 impl Clone for MutableArray {
     fn clone(&self) -> Self {
         unsafe {
-            return MutableArray {
+            MutableArray {
                 _ref: FLValue_Retain(self._ref as FLValue) as FLMutableArray,
-            };
+            }
         }
     }
 }
@@ -194,11 +194,11 @@ impl<'d> Array<'d> {
     pub fn as_mutable(self) -> Option<MutableArray> {
         unsafe {
             let md = FLArray_AsMutable(self._ref);
-            return if md.is_null() {
+            if md.is_null() {
                 None
             } else {
                 Some(MutableArray::adopt(md))
-            };
+            }
         }
     }
 
@@ -236,7 +236,7 @@ impl MutableDict {
 
     pub(crate) unsafe fn adopt(dict: FLMutableDict) -> MutableDict {
         FLValue_Retain(dict as FLValue);
-        return MutableDict { _ref: dict };
+        MutableDict { _ref: dict }
     }
 
     pub fn is_changed(&self) -> bool {
@@ -319,9 +319,9 @@ impl FleeceReference for MutableDict {
 impl Clone for MutableDict {
     fn clone(&self) -> Self {
         unsafe {
-            return MutableDict {
+            MutableDict {
                 _ref: FLValue_Retain(self._ref as FLValue) as FLMutableDict,
-            };
+            }
         }
     }
 }
@@ -384,11 +384,11 @@ impl<'d> Dict<'d> {
     pub fn as_mutable(self) -> Option<MutableDict> {
         unsafe {
             let md = FLDict_AsMutable(self._ref);
-            return if md.is_null() {
+            if md.is_null() {
                 None
             } else {
                 Some(MutableDict::adopt(md))
-            };
+            }
         }
     }
 

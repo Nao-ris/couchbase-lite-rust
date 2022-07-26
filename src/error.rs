@@ -30,7 +30,7 @@ pub struct Error {
 }
 
 /** The enum that stores the error domain and code for an Error. */
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ErrorCode {
     CouchbaseLite(CouchbaseLiteError),
     POSIX(i32),
@@ -45,7 +45,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 enum_from_primitive! {
     /** Couchbase Lite error codes. */
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     pub enum CouchbaseLiteError {
         AssertionFailed = 1,    // Internal assertion failure
         Unimplemented,          // Oops, an unimplemented API call
@@ -84,7 +84,7 @@ enum_from_primitive! {
 
 enum_from_primitive! {
     /** Fleece error codes. */
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     pub enum FleeceError {
         MemoryError = 1,    // Out of memory, or allocation failed
         OutOfRange,         // Array index or iterator out of range
@@ -102,7 +102,7 @@ enum_from_primitive! {
 
 enum_from_primitive! {
     /** Network error codes defined by Couchbase Lite. */
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     pub enum NetworkError {
         DNSFailure = 1,            // DNS lookup failed
         UnknownHost,               // DNS server doesn't know the hostname
@@ -177,11 +177,11 @@ impl Error {
                 code = *e as i32;
             }
         }
-        return CBLError {
+        CBLError {
             domain: domain as CBLErrorDomain,
-            code: code,
+            code,
             internal_info: self.internal_info.unwrap_or(0),
-        };
+        }
     }
 
     pub fn message(&self) -> String {
@@ -204,7 +204,7 @@ impl fmt::Debug for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
-        return fmt.write_str(&self.message());
+        fmt.write_str(&self.message())
     }
 }
 
@@ -227,14 +227,14 @@ impl ErrorCode {
             kCBLWebSocketDomain => return ErrorCode::WebSocket(err.code),
             _ => {}
         }
-        return ErrorCode::untranslatable();
+        ErrorCode::untranslatable()
     }
 
     fn from_fleece(fleece_error: u32) -> ErrorCode {
         if let Some(e) = FleeceError::from_u32(fleece_error) {
             return ErrorCode::Fleece(e);
         }
-        return ErrorCode::untranslatable();
+        ErrorCode::untranslatable()
     }
 
     fn untranslatable() -> ErrorCode {
@@ -271,15 +271,15 @@ impl std::ops::Not for &CBLError {
 // Convenient way to return a Result from a failed CBLError
 pub(crate) fn failure<T>(err: CBLError) -> Result<T> {
     assert!(err.code != 0);
-    return Err(Error::new(&err));
+    Err(Error::new(&err))
 }
 
 pub(crate) fn check_failure(status: bool, err: &CBLError) -> Result<()> {
     if status {
-        return Ok(());
+        Ok(())
     } else {
         assert!(err.code != 0);
-        return Err(Error::new(err));
+        Err(Error::new(err))
     }
 }
 
@@ -297,7 +297,7 @@ where
 {
     let mut error = CBLError::default();
     let ok = func(&mut error);
-    return check_failure(ok, &error);
+    check_failure(ok, &error)
 }
 
 // The first parameter is a function that returns a non-null pointer or sets the error.
@@ -309,11 +309,11 @@ where
 {
     let mut error = CBLError::default();
     let ptr = func(&mut error);
-    return if ptr.is_null() {
+    if ptr.is_null() {
         failure(error)
     } else {
         Ok(map(ptr))
-    };
+    }
 }
 
 // The first parameter is a function that returns a non-null pointer or sets the error.
@@ -326,11 +326,11 @@ where
     let n = func(&mut error);
     if n < 0 {
         // TODO: Better error mapping!
-        return Err(std::io::Error::new(
+        Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             Error::new(&error),
-        ));
+        ))
     } else {
-        return Ok(n as usize);
+        Ok(n as usize)
     }
 }
