@@ -18,9 +18,8 @@
 use super::c_api::*;
 
 use enum_primitive::FromPrimitive;
-use std::fmt;
 use std::ffi::CString;
-
+use std::fmt;
 
 enum_from_primitive! {
     /** Logging domains: subsystems that generate log messages. */
@@ -47,20 +46,18 @@ enum_from_primitive! {
     }
 }
 
-
 pub type LogCallback = Option<fn(Domain, Level, &str)>;
 
-
 /** Sets the detail level of console logging.
-    Only messages whose level is ≥ the given level will be logged to the console.
-    Default value is Info. */
+Only messages whose level is ≥ the given level will be logged to the console.
+Default value is Info. */
 pub fn set_console_level(level: Level) {
     unsafe { CBLLog_SetConsoleLevel(level as u8) }
 }
 
 /** Sets the detail level of logging to the registered callback (if any.)
-    Only messages whose level is ≥ the given level will be logged to the callback.
-    Default value is Info. */
+Only messages whose level is ≥ the given level will be logged to the callback.
+Default value is Info. */
 pub fn set_callback_level(level: Level) {
     unsafe { CBLLog_SetCallbackLevel(level as u8) }
 }
@@ -86,7 +83,7 @@ pub fn write(domain: Domain, level: Level, message: &str) {
         // CBL_Log doesn't invoke the callback, so do it manually:
         if let Some(callback) = LOG_CALLBACK {
             //if  CBLLog_WillLogToConsole(domain as u8, level as u8) {
-                callback(domain, level, message);
+            callback(domain, level, message);
             //}
         }
     }
@@ -97,9 +94,7 @@ pub fn write_args(domain: Domain, level: Level, args: fmt::Arguments) {
     write(domain, level, &format!("{:?}", args));
 }
 
-
 //////// LOGGING MACROS:
-
 
 /// A macro that writes a formatted Error-level log message.
 #[macro_export]
@@ -141,19 +136,18 @@ macro_rules! debug {
         format_args!($($arg)*)));
 }
 
-
 //////// INTERNALS:
 
+static mut LOG_CALLBACK: LogCallback = None;
 
-static mut LOG_CALLBACK : LogCallback = None;
-
-unsafe extern "C" fn invoke_log_callback(c_domain: CBLLogDomain,
-                                         c_level: CBLLogLevel,
-                                         msg: FLString)
-{
+unsafe extern "C" fn invoke_log_callback(
+    c_domain: CBLLogDomain,
+    c_level: CBLLogLevel,
+    msg: FLString,
+) {
     if let Some(cb) = LOG_CALLBACK {
         let domain = Domain::from_u8(c_domain).unwrap();
-        let level  = Level::from_u8(c_level).unwrap();
+        let level = Level::from_u8(c_level).unwrap();
         cb(domain, level, msg.as_str().unwrap());
     }
 }

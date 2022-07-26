@@ -20,11 +20,6 @@ extern crate lazy_static;
 
 use self::couchbase_lite::*;
 
-
-
-
-
-
 pub mod utils;
 
 //////// TESTS:

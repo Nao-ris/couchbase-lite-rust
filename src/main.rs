@@ -23,7 +23,6 @@ use tempdir::TempDir;
 
 use std::ptr;
 
-
 fn main() {
     // Create a new database in a temporary directory:
     let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
@@ -41,7 +40,8 @@ fn main() {
         props.at("i").put_i64(1234);
         props.at("s").put_string("Hello World!");
 
-        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
+            .expect("save");
     }
     // Reload the document and verify its properties:
     {

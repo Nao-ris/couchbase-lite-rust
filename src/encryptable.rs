@@ -15,7 +15,7 @@ impl From<*mut CBLEncryptable> for Encryptable {
 impl Encryptable {
     pub(crate) fn retain(_ref: *mut CBLEncryptable) -> Self {
         Encryptable {
-            _ref: unsafe { retain(_ref) }
+            _ref: unsafe { retain(_ref) },
         }
     }
 

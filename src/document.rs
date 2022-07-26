@@ -94,9 +94,7 @@ impl Database {
     `save_document_with_concurency_control` or
     `save_document_resolving` instead. */
     pub fn save_document(&mut self, doc: &mut Document) -> Result<()> {
-        unsafe {
-            check_bool(|error| CBLDatabase_SaveDocument(self.get_ref(), doc._ref, error))
-        }
+        unsafe { check_bool(|error| CBLDatabase_SaveDocument(self.get_ref(), doc._ref, error)) }
     }
 
     /** Saves a new or modified document to the database.
@@ -149,9 +147,7 @@ impl Database {
 
     /** Deletes a document from the database. Deletions are replicated. */
     pub fn delete_document(&mut self, doc: &Document) -> Result<()> {
-        unsafe {
-            check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc._ref, error))
-        }
+        unsafe { check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc._ref, error)) }
     }
 
     /** Deletes a document from the database. Deletions are replicated. */
@@ -176,9 +172,7 @@ impl Database {
     /** Purges a document. This removes all traces of the document from the database.
     Purges are _not_ replicated. If the document is changed on a server, it will be re-created */
     pub fn purge_document(&mut self, doc: &Document) -> Result<()> {
-        unsafe {
-            check_bool(|error| CBLDatabase_PurgeDocument(self.get_ref(), doc._ref, error))
-        }
+        unsafe { check_bool(|error| CBLDatabase_PurgeDocument(self.get_ref(), doc._ref, error)) }
     }
 
     /** Purges a document, given only its ID. */
@@ -196,8 +190,11 @@ impl Database {
     pub fn document_expiration(&self, doc_id: &str) -> Result<Option<Timestamp>> {
         unsafe {
             let mut error = CBLError::default();
-            let exp =
-                CBLDatabase_GetDocumentExpiration(self.get_ref(), as_slice(doc_id)._ref, &mut error);
+            let exp = CBLDatabase_GetDocumentExpiration(
+                self.get_ref(),
+                as_slice(doc_id)._ref,
+                &mut error,
+            );
             if exp < 0 {
                 failure(error)
             } else if exp == 0 {
