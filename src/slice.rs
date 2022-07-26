@@ -117,7 +117,7 @@ impl std::ops::Not for FLSlice {
 
 impl FLSliceResult {
     pub fn as_slice(&self) -> FLSlice {
-        return FLSlice{buf: self.buf, size: self.size};
+        FLSlice{buf: self.buf, size: self.size}
     }
 
     // pub unsafe fn retain(&mut self) {
@@ -134,14 +134,14 @@ impl FLSliceResult {
     pub unsafe fn to_string(mut self) -> Option<String> {
         let str = self.as_slice().to_string();
         self.release();
-        return str;
+        str
     }
 
     // Consumes & releases self
     pub unsafe fn to_vec(mut self) -> Option<Vec<u8>> {
         let vec = self.as_slice().to_vec();
         self.release();
-        return vec;
+        vec
     }
 }
 

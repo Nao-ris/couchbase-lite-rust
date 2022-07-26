@@ -19,11 +19,11 @@ extern crate couchbase_lite;
 extern crate lazy_static;
 
 use self::couchbase_lite::*;
-use encryptable::Encryptable;
-use lazy_static::lazy_static;
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+
+
+
+
 
 pub mod utils;
 

@@ -30,7 +30,7 @@ pub struct DatabaseConfiguration<'a> {
 }
 
 enum_from_primitive! {
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum MaintenanceType {
         Compact         = kCBLMaintenanceTypeCompact as isize,
         Reindex         = kCBLMaintenanceTypeReindex as isize,
@@ -88,7 +88,7 @@ impl Database {
         }
     }
     pub(crate) fn wrap(_ref: *mut CBLDatabase) -> Database {
-        Database { _ref: _ref }
+        Database { _ref }
     }
     pub(crate) fn get_ref(&self) -> *mut CBLDatabase {
         self._ref
@@ -107,9 +107,9 @@ impl Database {
                 if let Some(encryption_key) = cfg.encryption_key.as_ref() {
                     c_config.encryptionKey = *encryption_key;
                 }
-                return Database::_open(name, &c_config);
+                Database::_open(name, &c_config)
             } else {
-                return Database::_open(name, ptr::null());
+                Database::_open(name, ptr::null())
             }
         }
     }
@@ -120,7 +120,7 @@ impl Database {
         if db_ref.is_null() {
             return failure(err);
         }
-        return Ok(Database::wrap(db_ref));
+        Ok(Database::wrap(db_ref))
     }
 
     //////// OTHER STATIC METHODS:
@@ -144,11 +144,11 @@ impl Database {
                 as_slice(in_directory.as_ref().to_str().unwrap())._ref,
                 &mut error,
             ) {
-                return Ok(true);
+                Ok(true)
             } else if !error {
-                return Ok(false);
+                Ok(false)
             } else {
-                return failure(error);
+                failure(error)
             }
         }
     }
@@ -164,9 +164,9 @@ impl Database {
     /** Compacts a database file, freeing up unused disk space. */
     pub fn perform_maintenance(&mut self, of_type: MaintenanceType) -> Result<()> {
         unsafe {
-            return check_bool(|error| {
+            check_bool(|error| {
                 CBLDatabase_PerformMaintenance(self._ref, of_type as u32, error)
-            });
+            })
         }
     }
 
@@ -188,7 +188,7 @@ impl Database {
                 return failure(err);
             }
         }
-        return result;
+        result
     }
 
     //////// ACCESSORS:
@@ -203,14 +203,14 @@ impl Database {
     /** Returns the database's full filesystem path. */
     pub fn path(&self) -> PathBuf {
         unsafe {
-            return PathBuf::from(CBLDatabase_Path(self._ref).to_string().unwrap());
+            PathBuf::from(CBLDatabase_Path(self._ref).to_string().unwrap())
         }
     }
 
     /** Returns the number of documents in the database. */
     pub fn count(&self) -> u64 {
         unsafe {
-            return CBLDatabase_Count(self._ref);
+            CBLDatabase_Count(self._ref)
         }
     }
 
@@ -221,7 +221,7 @@ impl Database {
     if you want the callback to keep working. */
     pub fn add_listener(&mut self, listener: ChangeListener) -> ListenerToken {
         unsafe {
-            let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
+            let callback: *mut ::std::os::raw::c_void = listener as *mut std::ffi::c_void;
 
             ListenerToken {
                 _ref: CBLDatabase_AddChangeListener(
@@ -239,7 +239,7 @@ impl Database {
     `send_notifications` when you're ready. */
     pub fn buffer_notifications(&self, callback: BufferNotifications) {
         unsafe {
-            let callback: *mut ::std::os::raw::c_void = std::mem::transmute(callback);
+            let callback: *mut ::std::os::raw::c_void = callback as *mut std::ffi::c_void;
 
             CBLDatabase_BufferNotifications(
                 self._ref,

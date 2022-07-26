@@ -52,7 +52,7 @@ impl Query {
                 return failure(err);
             }
 
-            return Ok(Query{_ref: q});
+            Ok(Query{_ref: q})
         }
     }
 
@@ -71,7 +71,7 @@ impl Query {
 
     /** Returns the query's current parameter bindings, if any. */
     pub fn parameters(&self) -> Dict {
-        unsafe { return Dict{_ref: CBLQuery_Parameters(self._ref), _owner: PhantomData}; }
+        unsafe { Dict{_ref: CBLQuery_Parameters(self._ref), _owner: PhantomData} }
     }
 
     /** Returns information about the query, including the translated SQLite form, and the search
@@ -91,7 +91,7 @@ impl Query {
             if r.is_null() {
                 return failure(err);
             }
-            return Ok(ResultSet{_ref: r});
+            Ok(ResultSet{_ref: r})
         }
     }
 
@@ -146,7 +146,7 @@ impl<'r> Iterator for &'r ResultSet {
             if !CBLResultSet_Next(self._ref) {
                 return None;
             }
-            return Some(Row{results: &self})
+            Some(Row{results: self})
         }
     }
 }
@@ -183,7 +183,7 @@ impl<'r> Row<'r> {
     pub fn column_count(&self) -> isize {
         unsafe {
             let query = CBLResultSet_GetQuery(self.results._ref);
-            return CBLQuery_ColumnCount(query) as isize;
+            CBLQuery_ColumnCount(query) as isize
         }
     }
 
@@ -191,7 +191,7 @@ impl<'r> Row<'r> {
     pub fn column_name(&self, col: isize) -> Option<&str> {
         unsafe {
             let query = CBLResultSet_GetQuery(self.results._ref);
-            return CBLQuery_ColumnName(query, col as c_uint).as_str();
+            CBLQuery_ColumnName(query, col as c_uint).as_str()
         }
     }
 

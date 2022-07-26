@@ -37,7 +37,7 @@ impl Blob {
     pub fn new_from_data(data: &[u8], content_type: &str) -> Blob {
         unsafe {
             let blob = CBLBlob_CreateWithData(as_slice(content_type)._ref, bytes_as_slice(data)._ref);
-            return Blob{_ref: blob};
+            Blob{_ref: blob}
         }
     }
 
@@ -47,7 +47,7 @@ impl Blob {
         unsafe {
             let blob = CBLBlob_CreateWithStream(as_slice(content_type)._ref, stream._stream_ref);
             stream._stream_ref = std::ptr::null_mut();  // stop `drop` from closing the stream
-            return Blob{_ref: blob};
+            Blob{_ref: blob}
         }
     }
 
@@ -55,7 +55,7 @@ impl Blob {
     pub(crate) fn from_value<V: FleeceReference>(value: &V) -> Option<Blob> {
         unsafe {
             let blob = FLDict_GetBlob(FLValue_AsDict(value._fleece_ref()));
-            return if blob.is_null() {None} else {Some(Blob{_ref: blob})};
+            if blob.is_null() {None} else {Some(Blob{_ref: blob})}
         }
     }
 
@@ -93,7 +93,7 @@ impl Blob {
         unsafe {
             let mut err = CBLError::default();
             let content = CBLBlob_Content(self._ref, &mut err).to_vec();
-            return if let Some(c) = content { Ok(c) } else { failure(err) };
+            if let Some(c) = content { Ok(c) } else { failure(err) }
         }
     }
 
