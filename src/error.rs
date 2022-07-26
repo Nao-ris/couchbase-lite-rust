@@ -30,7 +30,7 @@ pub struct Error {
 }
 
 /** The enum that stores the error domain and code for an Error. */
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ErrorCode {
     CouchbaseLite(CouchbaseLiteError),
     POSIX(i32),
@@ -45,7 +45,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 enum_from_primitive! {
     /** Couchbase Lite error codes. */
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     pub enum CouchbaseLiteError {
         AssertionFailed = 1,    // Internal assertion failure
         Unimplemented,          // Oops, an unimplemented API call
@@ -84,7 +84,7 @@ enum_from_primitive! {
 
 enum_from_primitive! {
     /** Fleece error codes. */
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     pub enum FleeceError {
         MemoryError = 1,    // Out of memory, or allocation failed
         OutOfRange,         // Array index or iterator out of range
@@ -102,7 +102,7 @@ enum_from_primitive! {
 
 enum_from_primitive! {
     /** Network error codes defined by Couchbase Lite. */
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     pub enum NetworkError {
         DNSFailure = 1,            // DNS lookup failed
         UnknownHost,               // DNS server doesn't know the hostname
@@ -213,24 +213,21 @@ impl ErrorCode {
         match err.domain as u32 {
             kCBLDomain => {
                 if let Some(e) = CouchbaseLiteError::from_i32(err.code) {
-                    ErrorCode::CouchbaseLite(e)
-                } else {
-                    ErrorCode::untranslatable()
+                    return ErrorCode::CouchbaseLite(e);
                 }
             }
             kCBLNetworkDomain => {
                 if let Some(e) = NetworkError::from_i32(err.code as i32) {
-                    ErrorCode::Network(e)
-                } else {
-                    ErrorCode::untranslatable()
+                    return ErrorCode::Network(e);
                 }
             }
-            kCBLPOSIXDomain => ErrorCode::POSIX(err.code),
-            kCBLSQLiteDomain => ErrorCode::SQLite(err.code),
-            kCBLFleeceDomain => ErrorCode::from_fleece(err.code as u32),
-            kCBLWebSocketDomain => ErrorCode::WebSocket(err.code),
-            _ => ErrorCode::untranslatable(),
+            kCBLPOSIXDomain => return ErrorCode::POSIX(err.code),
+            kCBLSQLiteDomain => return ErrorCode::SQLite(err.code),
+            kCBLFleeceDomain => return ErrorCode::from_fleece(err.code as u32),
+            kCBLWebSocketDomain => return ErrorCode::WebSocket(err.code),
+            _ => {}
         }
+        ErrorCode::untranslatable()
     }
 
     fn from_fleece(fleece_error: u32) -> ErrorCode {
@@ -279,7 +276,10 @@ pub(crate) fn failure<T>(err: CBLError) -> Result<T> {
 
 pub(crate) fn check_failure(status: bool, err: &CBLError) -> Result<()> {
     if status {
-        return Ok(());
+        Ok(())
+    } else {
+        assert!(err.code != 0);
+        Err(Error::new(err))
     }
     assert!(err.code != 0);
     Err(Error::new(err))

@@ -15,10 +15,10 @@
 // limitations under the License.
 //
 
-use super::*;
-use super::slice::*;
 use super::c_api::*;
 use super::fleece::*;
+use super::slice::*;
+use super::*;
 
 use encryptable::Encryptable;
 
@@ -70,20 +70,16 @@ impl MutableArray {
         unsafe { FLMutableArray_IsChanged(self._ref) }
     }
 
-    pub fn at(&mut self, index: u32) -> Option<Slot> {
-        if self.count() > index {
-            Some(unsafe {
-                Slot {
-                    _ref: FLMutableArray_Set(self._ref, index),
-                    _owner: PhantomData,
-                }
-            })
-        } else {
-            None
+    pub fn at<'s>(&'s mut self, index: u32) -> Slot<'s> {
+        unsafe {
+            Slot {
+                _ref: FLMutableArray_Set(self._ref, index),
+                _owner: PhantomData,
+            }
         }
     }
 
-    pub fn append(&mut self) -> Slot {
+    pub fn append<'s>(&'s mut self) -> Slot<'s> {
         unsafe {
             Slot {
                 _ref: FLMutableArray_Append(self._ref),
@@ -258,7 +254,7 @@ impl MutableDict {
     pub fn at<'s>(&'s mut self, key: &str) -> Slot<'s> {
         unsafe {
             Slot {
-                _ref: FLMutableDict_Set(self._ref, as_slice(key)._ref),
+                _ref: FLMutableDict_Set(self._ref, as_slice(key)),
                 _owner: PhantomData,
             }
         }
@@ -286,7 +282,7 @@ impl MutableDict {
     pub fn set_encryptable_value(dict: MutableDict, key: String, encryptable: Encryptable) {
         unsafe {
             FLSlot_SetEncryptableValue(
-                FLMutableDict_Set(dict._ref, as_slice(&key)._ref),
+                FLMutableDict_Set(dict._ref, as_slice(&key)),
                 encryptable.get_ref(),
             );
         }

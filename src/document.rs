@@ -94,7 +94,9 @@ impl Database {
     `save_document_with_concurency_control` or
     `save_document_resolving` instead. */
     pub fn save_document(&mut self, doc: &mut Document) -> Result<()> {
-        unsafe { check_bool(|error| CBLDatabase_SaveDocument(self.get_ref(), doc._ref, error)) }
+        unsafe {
+            check_bool(|error| CBLDatabase_SaveDocument(self.get_ref(), doc._ref, error))
+        }
     }
 
     /** Saves a new or modified document to the database.
@@ -129,7 +131,7 @@ impl Database {
         conflict_handler: ConflictHandler,
     ) -> Result<Document> {
         unsafe {
-            let callback = conflict_handler as *mut std::ffi::c_void;
+            let callback: *mut ::std::os::raw::c_void = conflict_handler as *mut std::ffi::c_void;
             match check_bool(|error| {
                 CBLDatabase_SaveDocumentWithConflictHandler(
                     self.get_ref(),
@@ -147,7 +149,9 @@ impl Database {
 
     /** Deletes a document from the database. Deletions are replicated. */
     pub fn delete_document(&mut self, doc: &Document) -> Result<()> {
-        unsafe { check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc._ref, error)) }
+        unsafe {
+            check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc._ref, error))
+        }
     }
 
     /** Deletes a document from the database. Deletions are replicated. */
@@ -172,14 +176,16 @@ impl Database {
     /** Purges a document. This removes all traces of the document from the database.
     Purges are _not_ replicated. If the document is changed on a server, it will be re-created */
     pub fn purge_document(&mut self, doc: &Document) -> Result<()> {
-        unsafe { check_bool(|error| CBLDatabase_PurgeDocument(self.get_ref(), doc._ref, error)) }
+        unsafe {
+            check_bool(|error| CBLDatabase_PurgeDocument(self.get_ref(), doc._ref, error))
+        }
     }
 
     /** Purges a document, given only its ID. */
     pub fn purge_document_by_id(&mut self, id: &str) -> Result<()> {
         unsafe {
             check_bool(|error| {
-                CBLDatabase_PurgeDocumentByID(self.get_ref(), as_slice(id)._ref, error)
+                CBLDatabase_PurgeDocumentByID(self.get_ref(), as_slice(id), error)
             })
         }
     }
@@ -190,15 +196,14 @@ impl Database {
     pub fn document_expiration(&self, doc_id: &str) -> Result<Option<Timestamp>> {
         unsafe {
             let mut error = CBLError::default();
-            let exp = CBLDatabase_GetDocumentExpiration(
-                self.get_ref(),
-                as_slice(doc_id)._ref,
-                &mut error,
-            );
-            match exp {
-                0 => Ok(None),
-                _ if exp > 0 => Ok(Some(Timestamp(exp))),
-                _ => failure(error),
+            let exp =
+                CBLDatabase_GetDocumentExpiration(self.get_ref(), as_slice(doc_id), &mut error);
+            if exp < 0 {
+                failure(error)
+            } else if exp == 0 {
+                Ok(None)
+            } else {
+                Ok(Some(Timestamp(exp)))
             }
         }
     }
@@ -211,7 +216,7 @@ impl Database {
         };
         unsafe {
             check_bool(|error| {
-                CBLDatabase_SetDocumentExpiration(self.get_ref(), as_slice(doc_id)._ref, exp, error)
+                CBLDatabase_SetDocumentExpiration(self.get_ref(), as_slice(doc_id), exp, error)
             })
         }
     }
@@ -224,7 +229,7 @@ impl Database {
         listener: ChangeListener,
     ) -> ListenerToken {
         unsafe {
-            let callback = listener as *mut std::ffi::c_void;
+            let callback: *mut ::std::os::raw::c_void = listener as *mut std::ffi::c_void;
 
             ListenerToken {
                 _ref: CBLDatabase_AddDocumentChangeListener(
@@ -323,7 +328,7 @@ impl Document {
     pub fn set_properties_as_json(&mut self, json: &str) -> Result<()> {
         unsafe {
             let mut err = CBLError::default();
-            let ok = CBLDocument_SetJSON(self._ref, as_slice(json)._ref, &mut err);
+            let ok = CBLDocument_SetJSON(self._ref, as_slice(json), &mut err);
             check_failure(ok, &err)
         }
     }

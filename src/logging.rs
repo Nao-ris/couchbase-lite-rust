@@ -18,12 +18,12 @@
 use super::c_api::*;
 
 use enum_primitive::FromPrimitive;
-use std::fmt;
 use std::ffi::CString;
+use std::fmt;
 
 enum_from_primitive! {
     /** Logging domains: subsystems that generate log messages. */
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum Domain {
         Database,
         Query,
@@ -35,7 +35,7 @@ enum_from_primitive! {
 enum_from_primitive! {
     /** Levels of log messages. Higher values are more important/severe.
         Each level includes the lower ones. */
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum Level {
         Debug,
         Verbose,

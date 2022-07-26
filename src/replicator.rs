@@ -24,8 +24,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ptr;
 
-use super::*;
 use super::c_api::*;
+use super::*;
 
 // WARNING: THIS API IS UNIMPLEMENTED SO FAR
 
@@ -42,13 +42,11 @@ impl Endpoint {
         unsafe {
             let mut error = CBLError::default();
             let endpoint: *mut CBLEndpoint =
-                CBLEndpoint_CreateWithURL(as_slice(&url)._ref, &mut error as *mut CBLError);
+                CBLEndpoint_CreateWithURL(as_slice(&url), &mut error as *mut CBLError);
 
-            check_error(&error).and_then(|()| {
-                Ok(Self {
+            check_error(&error).map(|()| Self {
                     _ref: retain(endpoint),
                 })
-            })
         }
     }
 
@@ -80,8 +78,8 @@ impl Authenticator {
         unsafe {
             Self {
                 _ref: retain(CBLAuth_CreatePassword(
-                    as_slice(&username)._ref,
-                    as_slice(&password)._ref,
+                    as_slice(&username),
+                    as_slice(&password),
                 )),
             }
         }
@@ -91,8 +89,8 @@ impl Authenticator {
         unsafe {
             Self {
                 _ref: retain(CBLAuth_CreateSession(
-                    as_slice(&session_id)._ref,
-                    as_slice(&cookie_name)._ref,
+                    as_slice(&session_id),
+                    as_slice(&cookie_name),
                 )),
             }
         }
@@ -187,16 +185,16 @@ impl From<ProxySettings> for CBLProxySettings {
             type_: proxy_settings.proxy_type.into(),
             hostname: proxy_settings
                 .hostname
-                .map(|s| unsafe { FLSlice_Copy(as_slice(&s)._ref).as_slice() })
+                .map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() })
                 .unwrap_or(slice::NULL_SLICE),
             port: proxy_settings.port,
             username: proxy_settings
                 .username
-                .map(|s| unsafe { FLSlice_Copy(as_slice(&s)._ref).as_slice() })
+                .map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() })
                 .unwrap_or(slice::NULL_SLICE),
             password: proxy_settings
                 .password
-                .map(|s| unsafe { FLSlice_Copy(as_slice(&s)._ref).as_slice() })
+                .map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() })
                 .unwrap_or(slice::NULL_SLICE),
         }
     }
@@ -310,7 +308,7 @@ pub extern "C" fn c_property_encryptor(
 
         let error = cbl_error
             .as_ref()
-            .map(|e| Error::new(e))
+            .map(Error::new)
             .unwrap_or(Error::default());
 
         let result = (*repl_conf_context)
@@ -366,7 +364,7 @@ pub extern "C" fn c_property_decryptor(
 
         let error = cbl_error
             .as_ref()
-            .map(|e| Error::new(e))
+            .map(Error::new)
             .unwrap_or(Error::default());
 
         let result = (*repl_conf_context)
@@ -496,7 +494,7 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
         let proxy = config
             .proxy
             .map(|p| Box::new(p.into()))
-            .map(|b| Box::into_raw(b))
+            .map(Box::into_raw)
             .unwrap_or(ptr::null_mut());
         unsafe {
             CBLReplicatorConfiguration {
@@ -516,11 +514,11 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
                 headers: MutableDict::from_hashmap(&config.headers).as_dict()._ref,
                 pinnedServerCertificate: config
                     .pinned_server_certificate
-                    .map(|c| slice::bytes_as_slice(c)._ref)
+                    .map(slice::bytes_as_slice)
                     .unwrap_or(slice::NULL_SLICE),
                 trustedRootCertificates: config
                     .trusted_root_certificates
-                    .map(|c| slice::bytes_as_slice(c)._ref)
+                    .map(slice::bytes_as_slice)
                     .unwrap_or(slice::NULL_SLICE),
                 channels: config.channels._ref,
                 documentIDs: config.document_ids._ref,
@@ -558,7 +556,7 @@ impl Replicator {
             let mut error = CBLError::default();
             let replicator = CBLReplicator_Create(cbl_config, &mut error as *mut CBLError);
 
-            check_error(&error).and_then(|()| Ok(Replicator { _ref: replicator }))
+            check_error(&error).map(|()| Replicator { _ref: replicator })
         }
     }
 
@@ -722,15 +720,11 @@ unsafe extern "C" fn c_replicator_document_change_listener(
     let repl_documents = std::slice::from_raw_parts(documents, num_documents as usize)
         .iter()
         .filter_map(|document| {
-            if let Some(doc_id) = document.ID.to_string() {
-                Some(ReplicatedDocument {
+            document.ID.to_string().map(|doc_id| ReplicatedDocument {
                     id: doc_id,
                     flags: document.flags,
                     error: check_error(&document.error),
                 })
-            } else {
-                None
-            }
         })
         .collect();
 
@@ -791,18 +785,18 @@ impl Replicator {
             let mut error = CBLError::default();
             let result = CBLReplicator_IsDocumentPending(
                 self._ref,
-                as_slice(doc_id)._ref,
+                as_slice(doc_id),
                 &mut error as *mut CBLError,
             );
 
-            check_error(&error).and_then(|()| Ok(result))
+            check_error(&error).map(|()| result)
         }
     }
 
     /** Adds a listener that will be called when the replicator's status changes. */
     pub fn add_change_listener(&mut self, listener: ReplicatorChangeListener) -> ListenerToken {
         unsafe {
-            let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
+            let callback: *mut ::std::os::raw::c_void = listener as *mut std::ffi::c_void;
 
             ListenerToken {
                 _ref: CBLReplicator_AddChangeListener(
@@ -817,7 +811,7 @@ impl Replicator {
     /** Adds a listener that will be called when documents are replicated. */
     pub fn add_document_listener(&mut self, listener: ReplicatedDocumentListener) -> ListenerToken {
         unsafe {
-            let callback: *mut ::std::os::raw::c_void = std::mem::transmute(listener);
+            let callback: *mut ::std::os::raw::c_void = listener as *mut std::ffi::c_void;
 
             ListenerToken {
                 _ref: CBLReplicator_AddDocumentReplicationListener(

@@ -16,8 +16,8 @@
 //
 
 use super::*;
-use crate::slice::*;
 use crate::c_api::*;
+use crate::slice::*;
 
 use std::ffi::c_void;
 use std::marker::PhantomData;
@@ -33,8 +33,7 @@ impl Blob {
     /** Creates a new blob, given its contents as a byte array. */
     pub fn new_from_data(data: &[u8], content_type: &str) -> Blob {
         unsafe {
-            let blob =
-                CBLBlob_CreateWithData(as_slice(content_type)._ref, bytes_as_slice(data)._ref);
+            let blob = CBLBlob_CreateWithData(as_slice(content_type), bytes_as_slice(data));
             Blob { _ref: blob }
         }
     }
@@ -43,7 +42,7 @@ impl Blob {
     You should then add the blob to a document as a property, using [`Slot::put_blob`]. */
     pub fn new_from_stream(mut stream: BlobWriter, content_type: &str) -> Blob {
         unsafe {
-            let blob = CBLBlob_CreateWithStream(as_slice(content_type)._ref, stream._stream_ref);
+            let blob = CBLBlob_CreateWithStream(as_slice(content_type), stream._stream_ref);
             stream._stream_ref = std::ptr::null_mut(); // stop `drop` from closing the stream
             Blob { _ref: blob }
         }

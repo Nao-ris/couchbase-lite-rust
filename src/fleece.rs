@@ -15,10 +15,10 @@
 // limitations under the License.
 //
 
-use super::*;
-use super::slice::*;
-use super::error::*;
 use super::c_api::*;
+use super::error::*;
+use super::slice::*;
+use super::*;
 
 use encryptable::Encryptable;
 
@@ -50,7 +50,7 @@ impl Fleece {
             if doc.is_null() {
                 return Err(Error::fleece_error(FLError_kFLInvalidData));
             }
-            return Ok(Fleece { _ref: doc });
+            Ok(Fleece { _ref: doc })
         }
     }
 
@@ -61,7 +61,7 @@ impl Fleece {
             if doc.is_null() {
                 return Err(Error::fleece_error(error));
             }
-            return Ok(Fleece { _ref: doc });
+            Ok(Fleece { _ref: doc })
         }
     }
 
@@ -95,9 +95,9 @@ impl Drop for Fleece {
 impl Clone for Fleece {
     fn clone(&self) -> Self {
         unsafe {
-            return Fleece {
+            Fleece {
                 _ref: FLDoc_Retain(self._ref),
-            };
+            }
         }
     }
 }
@@ -105,7 +105,7 @@ impl Clone for Fleece {
 //////// VALUE
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Eq)]
     pub enum ValueType {
         Undefined = -1,  // Type of a NULL pointer, i.e. no such value, like JSON `undefined`
         Null = 0,        // Equivalent to a JSON 'null'
@@ -168,7 +168,7 @@ impl<'f> Value<'f> {
 
     pub fn get_type(&self) -> ValueType {
         unsafe {
-            return ValueType::from_i32(FLValue_GetType(self._ref)).unwrap();
+            ValueType::from_i32(FLValue_GetType(self._ref)).unwrap()
         }
     }
     pub fn is_type(&self, t: ValueType) -> bool {
@@ -243,7 +243,7 @@ impl<'f> Value<'f> {
             if t == 0 {
                 return None;
             }
-            return Some(Timestamp(t));
+            Some(Timestamp(t))
         }
     }
 
@@ -318,7 +318,7 @@ impl fmt::Debug for Value<'_> {
 
 impl fmt::Display for Value<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        return f.write_str(&self.to_json());
+        f.write_str(&self.to_json())
     }
 }
 
@@ -362,7 +362,6 @@ impl<'f> Array<'f> {
             ArrayIterator {
                 _innards: i.assume_init(),
                 _owner: self._owner,
-                _len: self.count() as usize,
             }
         }
     }
@@ -431,7 +430,6 @@ impl<'a> IntoIterator for Array<'a> {
 pub struct ArrayIterator<'a> {
     _innards: FLArrayIterator,
     _owner: PhantomData<&'a Fleece>,
-    _len: usize,
 }
 
 impl<'a> ArrayIterator<'a> {
@@ -464,24 +462,6 @@ impl<'f> Iterator for ArrayIterator<'f> {
                 _owner: PhantomData,
             })
         }
-    }
-}
-
-impl<'f> std::iter::FusedIterator for ArrayIterator<'f> {}
-
-impl<'f> ExactSizeIterator for ArrayIterator<'f> {
-    fn len(&self) -> usize {
-        self._len
-    }
-}
-
-impl<'f> std::iter::FromIterator<Value<'f>> for MutableArray {
-    fn from_iter<I: IntoIterator<Item = Value<'f>>>(iter: I) -> Self {
-        let mut c = MutableArray::new();
-        for v in iter {
-            c.append().put_value(&v);
-        }
-        c
     }
 }
 
@@ -523,7 +503,7 @@ impl<'f> Dict<'f> {
     pub fn get(&self, key: &str) -> Value<'f> {
         unsafe {
             Value {
-                _ref: FLDict_Get(self._ref, as_slice(key)._ref),
+                _ref: FLDict_Get(self._ref, as_slice(key)),
                 _owner: self._owner,
             }
         }
@@ -552,7 +532,6 @@ impl<'f> Dict<'f> {
             DictIterator {
                 _innards: i.assume_init(),
                 _owner: self._owner,
-                _len: self.count() as usize,
             }
         }
     }
@@ -626,7 +605,7 @@ impl DictKey {
     pub fn new(key: &str) -> DictKey {
         unsafe {
             DictKey {
-                _innards: FLDictKey_Init(as_slice(key)._ref),
+                _innards: FLDictKey_Init(as_slice(key)),
             }
         }
     }
@@ -641,7 +620,6 @@ impl DictKey {
 pub struct DictIterator<'a> {
     _innards: FLDictIterator,
     _owner: PhantomData<&'a Fleece>,
-    _len: usize,
 }
 
 impl<'a> DictIterator<'a> {

@@ -30,62 +30,18 @@ pub const NULL_SLICE: FLSlice = FLSlice {
     size: 0,
 };
 
-#[derive(Clone, Copy)]
-pub struct Slice<T> {
-    pub(crate) _ref: FLSlice,
-    _owner: T,
-}
-
-impl<T> Slice<T> {
-    pub const fn wrap(slice: FLSlice, _owner: T) -> Self {
-        Self {
-            _ref: slice,
-            _owner,
-        }
-    }
-
-    pub fn as_byte_array(&self) -> Option<&[u8]> {
-        unsafe { self._ref.as_byte_array() }
-    }
-
-    pub fn as_str(&self) -> Option<&str> {
-        unsafe { self._ref.as_str() }
-    }
-
-    pub fn to_string(&self) -> Option<String> {
-        unsafe { self._ref.to_string() }
-    }
-
-    pub fn to_vec(&self) -> Option<Vec<u8>> {
-        unsafe { self._ref.to_vec() }
-    }
-
-    pub fn map<F, FT>(&self, f: F) -> Option<FT>
-    where
-        F: Fn(&FLSlice) -> FT,
-    {
-        self._ref.map(f)
+pub fn as_slice(s: &str) -> FLSlice {
+    FLSlice {
+        buf: s.as_ptr() as *const c_void,
+        size: s.len() as u64,
     }
 }
 
-pub fn as_slice(s: &str) -> Slice<&str> {
-    Slice::wrap(
-        FLSlice {
-            buf: s.as_ptr() as *const c_void,
-            size: s.len() as u64,
-        },
-        s,
-    )
-}
-
-pub fn bytes_as_slice(s: &[u8]) -> Slice<&[u8]> {
-    Slice::wrap(
-        FLSlice {
-            buf: s.as_ptr() as *const c_void,
-            size: s.len() as u64,
-        },
-        s,
-    )
+pub fn bytes_as_slice(s: &[u8]) -> FLSlice {
+    FLSlice {
+        buf: s.as_ptr() as *const c_void,
+        size: s.len() as u64,
+    }
 }
 
 impl FLSlice {
@@ -148,39 +104,37 @@ impl FLSliceResult {
         }
     }
 
-    // Consumes & releases self
-    pub unsafe fn to_string(self) -> Option<String> {
-        self.as_slice().to_string()
+    // pub unsafe fn retain(&mut self) {
+    //     _FLBuf_Retain(self.buf);
+    // }
+
+    // It's not possible to implement Drop for FLSliceResult, because the generated interface
+    // makes it implement Copy. So it has to be released by hand.
+    pub unsafe fn release(&mut self) {
+        _FLBuf_Release(self.buf);
     }
 
     // Consumes & releases self
-    pub unsafe fn to_vec(self) -> Option<Vec<u8>> {
-        self.as_slice().to_vec()
+    pub unsafe fn to_string(mut self) -> Option<String> {
+        let str = self.as_slice().to_string();
+        self.release();
+        str
     }
-}
 
-impl Clone for FLSliceResult {
-    fn clone(&self) -> Self {
-        unsafe { _FLBuf_Retain(self.buf) };
-        Self {
-            buf: self.buf,
-            size: self.size,
-        }
-    }
-}
-
-impl Drop for FLSliceResult {
-    fn drop(&mut self) {
-        unsafe { _FLBuf_Release(self.buf) };
+    // Consumes & releases self
+    pub unsafe fn to_vec(mut self) -> Option<Vec<u8>> {
+        let vec = self.as_slice().to_vec();
+        self.release();
+        vec
     }
 }
 
 //////// C STRINGS
 
 // Convenience to convert a raw `char*` to an unowned `&str`
-pub unsafe fn to_str<'a>(cstr: *const ::std::os::raw::c_char) -> Cow<'a, str> {
-    CStr::from_ptr(cstr).to_string_lossy()
-}
+// pub unsafe fn to_str<'a>(cstr: *const ::std::os::raw::c_char) -> Cow<'a, str> {
+//     return CStr::from_ptr(cstr).to_string_lossy()
+// }
 
 // Convenience to convert a raw `char*` to an owned String
 pub unsafe fn to_string(cstr: *const ::std::os::raw::c_char) -> String {

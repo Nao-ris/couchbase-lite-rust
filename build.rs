@@ -31,19 +31,10 @@ use std::path::PathBuf;
 // Where to find the Couchbase Lite headers and library:    //TODO: Make this easily configurable
 static CBL_INCLUDE_DIR: &str = "libcblite-3.0.1/include";
 static CBL_LIB_DIR: &str = "libcblite-3.0.1/lib";
-
-#[cfg(target_os = "macos")]
 static CBL_LIB_FILENAME: &str = "libcblite.dylib";
 
-#[cfg(target_os = "linux")]
-static CBL_LIB_FILENAME: &str = "libcblite.so";
-
 // Where to find Clang and LLVM libraries:
-#[cfg(target_os = "macos")]
 static DEFAULT_LIBCLANG_PATH: &str = "/usr/local/Cellar/llvm/12.0.1/lib";
-
-#[cfg(target_os = "linux")]
-static DEFAULT_LIBCLANG_PATH: &str = "/usr/lib/";
 
 static STATIC_LINK_CBL: bool = false;
 static CBL_SRC_DIR: &str = "../../CBL_C";

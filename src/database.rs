@@ -15,10 +15,10 @@
 // limitations under the License.
 //
 
-use super::*;
-use super::slice::*;
-use super::error::*;
 use super::c_api::*;
+use super::error::*;
+use super::slice::*;
+use super::*;
 
 use std::path::*;
 use std::ptr;
@@ -31,7 +31,7 @@ pub struct DatabaseConfiguration<'a> {
 
 enum_from_primitive! {
     /** Conflict-handling options when saving or deleting a document. */
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum MaintenanceType {
         Compact         = kCBLMaintenanceTypeCompact as isize,
         Reindex         = kCBLMaintenanceTypeReindex as isize,
@@ -106,11 +106,13 @@ impl Database {
         unsafe {
             if let Some(cfg) = config {
                 let mut c_config: CBLDatabaseConfiguration = CBLDatabaseConfiguration_Default();
-                c_config.directory = as_slice(cfg.directory.to_str().unwrap())._ref;
+                c_config.directory = as_slice(cfg.directory.to_str().unwrap());
                 if let Some(encryption_key) = cfg.encryption_key.as_ref() {
                     c_config.encryptionKey = *encryption_key;
                 }
-                return Database::_open(name, &c_config);
+                Database::_open(name, &c_config)
+            } else {
+                Database::_open(name, ptr::null())
             }
             Database::_open(name, ptr::null())
         }
@@ -130,10 +132,10 @@ impl Database {
     /** Returns true if a database with the given name exists in the given directory. */
     pub fn exists<P: AsRef<Path>>(name: &str, in_directory: P) -> bool {
         unsafe {
-            CBL_DatabaseExists(
-                as_slice(name)._ref,
-                as_slice(in_directory.as_ref().to_str().unwrap())._ref,
-            )
+            return CBL_DatabaseExists(
+                as_slice(name),
+                as_slice(in_directory.as_ref().to_str().unwrap()),
+            );
         }
     }
 
@@ -142,8 +144,8 @@ impl Database {
         unsafe {
             let mut error = CBLError::default();
             if CBL_DeleteDatabase(
-                as_slice(name)._ref,
-                as_slice(in_directory.as_ref().to_str().unwrap())._ref,
+                as_slice(name),
+                as_slice(in_directory.as_ref().to_str().unwrap()),
                 &mut error,
             ) {
                 Ok(true)
@@ -166,7 +168,9 @@ impl Database {
     /** Compacts a database file, freeing up unused disk space. */
     pub fn perform_maintenance(&mut self, of_type: MaintenanceType) -> Result<()> {
         unsafe {
-            check_bool(|error| CBLDatabase_PerformMaintenance(self._ref, of_type as u32, error))
+            check_bool(|error| {
+                CBLDatabase_PerformMaintenance(self._ref, of_type as u32, error)
+            })
         }
     }
 
@@ -200,12 +204,16 @@ impl Database {
 
     /** Returns the database's full filesystem path. */
     pub fn path(&self) -> PathBuf {
-        unsafe { PathBuf::from(CBLDatabase_Path(self._ref).to_string().unwrap()) }
+        unsafe {
+            PathBuf::from(CBLDatabase_Path(self._ref).to_string().unwrap())
+        }
     }
 
     /** Returns the number of documents in the database. */
     pub fn count(&self) -> u64 {
-        unsafe { CBLDatabase_Count(self._ref) }
+        unsafe {
+            CBLDatabase_Count(self._ref)
+        }
     }
 
     //////// NOTIFICATIONS:
@@ -215,7 +223,7 @@ impl Database {
     if you want the callback to keep working. */
     pub fn add_listener(&mut self, listener: ChangeListener) -> ListenerToken {
         unsafe {
-            let callback = listener as *mut std::ffi::c_void;
+            let callback: *mut ::std::os::raw::c_void = listener as *mut std::ffi::c_void;
 
             ListenerToken {
                 _ref: CBLDatabase_AddChangeListener(
@@ -233,7 +241,7 @@ impl Database {
     `send_notifications` when you're ready. */
     pub fn buffer_notifications(&self, callback: BufferNotifications) {
         unsafe {
-            let callback = callback as *mut std::ffi::c_void;
+            let callback: *mut ::std::os::raw::c_void = callback as *mut std::ffi::c_void;
 
             CBLDatabase_BufferNotifications(
                 self._ref,

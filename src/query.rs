@@ -15,9 +15,9 @@
 // limitations under the License.
 //
 
-use super::*;
-use super::slice::*;
 use super::c_api::*;
+use super::slice::*;
+use super::*;
 
 use std::marker::PhantomData;
 use std::os::raw::c_uint;
@@ -46,7 +46,7 @@ impl Query {
             let q = CBLDatabase_CreateQuery(
                 db.get_ref(),
                 language as CBLQueryLanguage,
-                as_slice(str)._ref,
+                as_slice(str),
                 &mut pos,
                 &mut err,
             );
@@ -54,7 +54,6 @@ impl Query {
                 // TODO: Return the error pos somehow
                 return failure(err);
             }
-
             Ok(Query { _ref: q })
         }
     }
@@ -160,7 +159,7 @@ impl<'r> Iterator for &'r ResultSet {
             if !CBLResultSet_Next(self._ref) {
                 return None;
             }
-            Some(Row { results: &self })
+            Some(Row { results: self })
         }
     }
 }
@@ -195,7 +194,7 @@ impl<'r> Row<'r> {
     pub fn get_key(&self, key: &str) -> Value<'r> {
         unsafe {
             Value {
-                _ref: CBLResultSet_ValueForKey(self.results._ref, as_slice(key)._ref),
+                _ref: CBLResultSet_ValueForKey(self.results._ref, as_slice(key)),
                 _owner: PhantomData,
             }
         }

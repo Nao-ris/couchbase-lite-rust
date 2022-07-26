@@ -33,7 +33,7 @@ pub mod query;
 pub mod replicator;
 
 mod c_api;
-pub mod slice;
+mod slice;
 
 use self::c_api::*;
 
