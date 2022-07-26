@@ -32,107 +32,118 @@ lazy_static! {
     static ref DOCUMENT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 }
 
-#[test]
-fn in_transaction() {
-    utils::with_db(|db| {
-        let result = db.in_transaction(|db| {
+#[cfg(feature = "concurrency-test")]
+mod concurrency {
+    use super::*;
+
+    #[test]
+    fn in_transaction() {
+        utils::with_db(|db| {
+            let result = db.in_transaction(|db| {
+                let mut doc = Document::new_with_id("document");
+                db.save_document_with_concurency_control(
+                    &mut doc,
+                    ConcurrencyControl::LastWriteWins,
+                )
+                .unwrap();
+                Ok("document".to_string())
+            });
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "document");
+
+            let result = db.in_transaction(|db| -> Result<String> {
+                let mut doc = Document::new_with_id("document_error");
+                db.save_document_with_concurency_control(
+                    &mut doc,
+                    ConcurrencyControl::LastWriteWins,
+                )
+                .unwrap();
+                Err(couchbase_lite::Error::default())
+            });
+
+            assert!(result.is_err());
+
+            assert!(db.get_document("document").is_ok());
+            assert!(db.get_document("document_error").is_err());
+        });
+    }
+
+    #[test]
+    fn db_properties() {
+        utils::with_db(|db| {
+            assert_eq!(db.name(), utils::DB_NAME);
+            assert_eq!(db.count(), 0);
+        });
+    }
+
+    #[test]
+    fn add_listener() {
+        utils::set_static(&DOCUMENT_DETECTED, false);
+
+        utils::with_db(|db| {
+            let listener_token = db.add_listener(|_, doc_ids| {
+                if doc_ids.first().unwrap() == "document" {
+                    utils::set_static(&DOCUMENT_DETECTED, true);
+                }
+            });
+
             let mut doc = Document::new_with_id("document");
             db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
                 .unwrap();
-            Ok("document".to_string())
+
+            assert!(utils::check_static_with_wait(
+                &DOCUMENT_DETECTED,
+                true,
+                None
+            ));
+
+            drop(listener_token);
         });
+    }
 
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "document");
+    #[test]
+    fn buffer_notifications() {
+        utils::set_static(&BUFFER_NOTIFICATIONS, false);
+        utils::set_static(&DOCUMENT_DETECTED, false);
 
-        let result = db.in_transaction(|db| -> Result<String> {
-            let mut doc = Document::new_with_id("document_error");
+        utils::with_db(|db| {
+            db.buffer_notifications(|_| {
+                utils::set_static(&BUFFER_NOTIFICATIONS, true);
+            });
+
+            let listener_token = db.add_listener(|_, doc_ids| {
+                if doc_ids.first().unwrap() == "document" {
+                    utils::set_static(&DOCUMENT_DETECTED, true);
+                }
+            });
+
+            let mut doc = Document::new_with_id("document");
             db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
                 .unwrap();
-            Err(couchbase_lite::Error::default())
+
+            assert!(!utils::check_static_with_wait(
+                &DOCUMENT_DETECTED,
+                true,
+                None
+            ));
+            assert!(utils::check_static_with_wait(
+                &BUFFER_NOTIFICATIONS,
+                true,
+                None
+            ));
+
+            db.send_notifications();
+
+            assert!(utils::check_static_with_wait(
+                &DOCUMENT_DETECTED,
+                true,
+                None
+            ));
+
+            drop(listener_token);
         });
-
-        assert!(result.is_err());
-
-        assert!(db.get_document("document").is_ok());
-        assert!(db.get_document("document_error").is_err());
-    });
-}
-
-#[test]
-fn db_properties() {
-    utils::with_db(|db| {
-        assert_eq!(db.name(), utils::DB_NAME);
-        assert_eq!(db.count(), 0);
-    });
-}
-
-#[test]
-fn add_listener() {
-    utils::set_static(&DOCUMENT_DETECTED, false);
-
-    utils::with_db(|db| {
-        let listener_token = db.add_listener(|_, doc_ids| {
-            if doc_ids.first().unwrap() == "document" {
-                utils::set_static(&DOCUMENT_DETECTED, true);
-            }
-        });
-
-        let mut doc = Document::new_with_id("document");
-        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
-            .unwrap();
-
-        assert!(utils::check_static_with_wait(
-            &DOCUMENT_DETECTED,
-            true,
-            None
-        ));
-
-        drop(listener_token);
-    });
-}
-
-#[test]
-fn buffer_notifications() {
-    utils::set_static(&BUFFER_NOTIFICATIONS, false);
-    utils::set_static(&DOCUMENT_DETECTED, false);
-
-    utils::with_db(|db| {
-        db.buffer_notifications(|_| {
-            utils::set_static(&BUFFER_NOTIFICATIONS, true);
-        });
-
-        let listener_token = db.add_listener(|_, doc_ids| {
-            if doc_ids.first().unwrap() == "document" {
-                utils::set_static(&DOCUMENT_DETECTED, true);
-            }
-        });
-
-        let mut doc = Document::new_with_id("document");
-        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
-            .unwrap();
-
-        assert!(!utils::check_static_with_wait(
-            &DOCUMENT_DETECTED,
-            true,
-            None
-        ));
-        assert!(utils::check_static_with_wait(
-            &BUFFER_NOTIFICATIONS,
-            true,
-            None
-        ));
-
-        db.send_notifications();
-
-        assert!(utils::check_static_with_wait(
-            &DOCUMENT_DETECTED,
-            true,
-            None
-        ));
-
-        drop(listener_token);
-    });
+    }
 }
 
 /*
