@@ -40,6 +40,7 @@ enum_from_primitive! {
     }
 }
 
+/** A database change listener callback, invoked after one or more documents are changed on disk. */
 type ChangeListener = fn(db: &Database, doc_ids: Vec<String>);
 #[no_mangle]
 unsafe extern "C" fn c_database_change_listener(
@@ -60,6 +61,7 @@ unsafe extern "C" fn c_database_change_listener(
     callback(&database, doc_ids);
 }
 
+/** Callback indicating that the database (or an object belonging to it) is ready to call one or more listeners. */
 type BufferNotifications = fn(db: &Database);
 #[no_mangle]
 unsafe extern "C" fn c_database_buffer_notifications(
@@ -164,9 +166,7 @@ impl Database {
     /** Compacts a database file, freeing up unused disk space. */
     pub fn perform_maintenance(&mut self, of_type: MaintenanceType) -> Result<()> {
         unsafe {
-            check_bool(|error| {
-                CBLDatabase_PerformMaintenance(self._ref, of_type as u32, error)
-            })
+            check_bool(|error| CBLDatabase_PerformMaintenance(self._ref, of_type as u32, error))
         }
     }
 
@@ -202,16 +202,12 @@ impl Database {
 
     /** Returns the database's full filesystem path. */
     pub fn path(&self) -> PathBuf {
-        unsafe {
-            PathBuf::from(CBLDatabase_Path(self._ref).to_string().unwrap())
-        }
+        unsafe { PathBuf::from(CBLDatabase_Path(self._ref).to_string().unwrap()) }
     }
 
     /** Returns the number of documents in the database. */
     pub fn count(&self) -> u64 {
-        unsafe {
-            CBLDatabase_Count(self._ref)
-        }
+        unsafe { CBLDatabase_Count(self._ref) }
     }
 
     //////// NOTIFICATIONS:
