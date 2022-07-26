@@ -27,92 +27,123 @@ use std::sync::{Arc, Mutex};
 
 //////// TESTS:
 
-#[test]
-fn db_properties() {
-    utils::with_db(|db| {
-        assert_eq!(db.name(), utils::DB_NAME);
-        assert_eq!(db.count(), 0);
-    });
-}
-
-#[test]
-fn in_transaction() {
-    utils::with_db(|db| {
-        let result = db.in_transaction(|db| {
-            let mut doc = Document::new_with_id("document");
-            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
-            Ok("document".to_string())
-        });
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "document");
-
-        let result = db.in_transaction(|db| -> Result<String> {
-            let mut doc = Document::new_with_id("document_error");
-            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
-            Err(couchbase_lite::Error::default())
-        });
-
-        assert!(result.is_err());
-
-        assert!(db.get_document("document").is_ok());
-        assert!(db.get_document("document_error").is_err());
-    });
-}
-
 lazy_static! {
     static ref BUFFER_NOTIFICATIONS: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     static ref DOCUMENT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 }
 
-#[test]
-fn add_listener() {
-    utils::set_static(&DOCUMENT_DETECTED, false);
+#[cfg(feature = "concurrency-test")]
+mod concurrency {
+    use super::*;
 
-    utils::with_db(|db| {
-        let listener_token = db.add_listener(| _, doc_ids| {
-            if doc_ids.first().unwrap() == "document" {
-                utils::set_static(&DOCUMENT_DETECTED, true);
-            }
+    #[test]
+    fn in_transaction() {
+        utils::with_db(|db| {
+            let result = db.in_transaction(|db| {
+                let mut doc = Document::new_with_id("document");
+                db.save_document_with_concurency_control(
+                    &mut doc,
+                    ConcurrencyControl::LastWriteWins,
+                )
+                .unwrap();
+                Ok("document".to_string())
+            });
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "document");
+
+            let result = db.in_transaction(|db| -> Result<String> {
+                let mut doc = Document::new_with_id("document_error");
+                db.save_document_with_concurency_control(
+                    &mut doc,
+                    ConcurrencyControl::LastWriteWins,
+                )
+                .unwrap();
+                Err(couchbase_lite::Error::default())
+            });
+
+            assert!(result.is_err());
+
+            assert!(db.get_document("document").is_ok());
+            assert!(db.get_document("document_error").is_err());
         });
+    }
 
-        let mut doc = Document::new_with_id("document");
-        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
-
-        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
-
-        drop(listener_token);
-    });
-}
-
-#[test]
-fn buffer_notifications() {
-    utils::set_static(&BUFFER_NOTIFICATIONS, false);
-    utils::set_static(&DOCUMENT_DETECTED, false);
-
-    utils::with_db(|db| {
-        db.buffer_notifications(|_| {
-            utils::set_static(&BUFFER_NOTIFICATIONS, true);
+    #[test]
+    fn db_properties() {
+        utils::with_db(|db| {
+            assert_eq!(db.name(), utils::DB_NAME);
+            assert_eq!(db.count(), 0);
         });
+    }
 
-        let listener_token = db.add_listener(| _, doc_ids| {
-            if doc_ids.first().unwrap() == "document" {
-                utils::set_static(&DOCUMENT_DETECTED, true);
-            }
+    #[test]
+    fn add_listener() {
+        utils::set_static(&DOCUMENT_DETECTED, false);
+
+        utils::with_db(|db| {
+            let listener_token = db.add_listener(|_, doc_ids| {
+                if doc_ids.first().unwrap() == "document" {
+                    utils::set_static(&DOCUMENT_DETECTED, true);
+                }
+            });
+
+            let mut doc = Document::new_with_id("document");
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+                .unwrap();
+
+            assert!(utils::check_static_with_wait(
+                &DOCUMENT_DETECTED,
+                true,
+                None
+            ));
+
+            drop(listener_token);
         });
+    }
 
-        let mut doc = Document::new_with_id("document");
-        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+    #[test]
+    fn buffer_notifications() {
+        utils::set_static(&BUFFER_NOTIFICATIONS, false);
+        utils::set_static(&DOCUMENT_DETECTED, false);
 
-        assert!(!utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
-        assert!(utils::check_static_with_wait(&BUFFER_NOTIFICATIONS, true, None));
+        utils::with_db(|db| {
+            db.buffer_notifications(|_| {
+                utils::set_static(&BUFFER_NOTIFICATIONS, true);
+            });
 
-        db.send_notifications();
+            let listener_token = db.add_listener(|_, doc_ids| {
+                if doc_ids.first().unwrap() == "document" {
+                    utils::set_static(&DOCUMENT_DETECTED, true);
+                }
+            });
 
-        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
+            let mut doc = Document::new_with_id("document");
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+                .unwrap();
 
-        drop(listener_token);
-    });
+            assert!(!utils::check_static_with_wait(
+                &DOCUMENT_DETECTED,
+                true,
+                None
+            ));
+            assert!(utils::check_static_with_wait(
+                &BUFFER_NOTIFICATIONS,
+                true,
+                None
+            ));
+
+            db.send_notifications();
+
+            assert!(utils::check_static_with_wait(
+                &DOCUMENT_DETECTED,
+                true,
+                None
+            ));
+
+            drop(listener_token);
+        });
+    }
 }
 
 /*

@@ -21,3 +21,6 @@ lto = true
 codegen-units = 1
 incremental = false
 # See: https://github.com/johnthagen/min-sized-rust
+
+[features]
+concurrency-test = []
