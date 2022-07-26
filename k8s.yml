@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: couchbase-lite-test
+spec:
+  containers:
+  - name: couchbase-lite-test
+    image: couchbase-lite-test

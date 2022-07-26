@@ -45,12 +45,13 @@ impl Query {
         unsafe {
             let mut pos: i32 = 0;
             let mut err = CBLError::default();
-            let q = CBLDatabase_CreateQuery(db.get_ref(), language as CBLQueryLanguage, as_slice(str),
+            let q = CBLDatabase_CreateQuery(db.get_ref(), language as CBLQueryLanguage, as_slice(str)._ref,
                                             &mut pos, &mut err);
             if q.is_null() {
                 // TODO: Return the error pos somehow
                 return failure(err);
             }
+
             return Ok(Query{_ref: q});
         }
     }
@@ -174,7 +175,7 @@ impl<'r> Row<'r> {
 
     /** Returns the value of a column, given its name. */
     pub fn get_key(&self, key: &str) -> Value<'r> {
-        unsafe { Value{_ref: CBLResultSet_ValueForKey(self.results._ref, as_slice(key)),
+        unsafe { Value{_ref: CBLResultSet_ValueForKey(self.results._ref, as_slice(key)._ref),
                        _owner: PhantomData} }
     }
 

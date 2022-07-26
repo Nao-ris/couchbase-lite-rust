@@ -104,7 +104,7 @@ impl Database {
         unsafe {
             if let Some(cfg) = config {
                 let mut c_config: CBLDatabaseConfiguration  = CBLDatabaseConfiguration_Default();
-                c_config.directory = as_slice(cfg.directory.to_str().unwrap());
+                c_config.directory = as_slice(cfg.directory.to_str().unwrap())._ref;
                 if let Some(encryption_key) = cfg.encryption_key.as_ref() {
                     c_config.encryptionKey = *encryption_key;
                 }
@@ -118,7 +118,7 @@ impl Database {
 
     unsafe fn _open(name: &str, config_ptr: *const CBLDatabaseConfiguration) -> Result<Database> {
         let mut err = CBLError::default();
-        let db_ref = CBLDatabase_Open(as_slice(name), config_ptr, &mut err);
+        let db_ref = CBLDatabase_Open(as_slice(name)._ref, config_ptr, &mut err);
         if db_ref.is_null() {
             return failure(err);
         }
@@ -132,8 +132,8 @@ impl Database {
     /** Returns true if a database with the given name exists in the given directory. */
     pub fn exists<P: AsRef<Path>>(name: &str, in_directory: P) -> bool {
         unsafe {
-            return CBL_DatabaseExists(as_slice(name),
-                                      as_slice(in_directory.as_ref().to_str().unwrap()));
+            return CBL_DatabaseExists(as_slice(name)._ref,
+                                      as_slice(in_directory.as_ref().to_str().unwrap())._ref);
         }
     }
 
@@ -142,8 +142,8 @@ impl Database {
     pub fn delete_file<P: AsRef<Path>>(name: &str, in_directory: P) -> Result<bool> {
         unsafe {
             let mut error = CBLError::default();
-            if CBL_DeleteDatabase(as_slice(name),
-                                    as_slice(in_directory.as_ref().to_str().unwrap()),
+            if CBL_DeleteDatabase(as_slice(name)._ref,
+                                    as_slice(in_directory.as_ref().to_str().unwrap())._ref,
                                     &mut error) {
                 return Ok(true);
             } else if !error {

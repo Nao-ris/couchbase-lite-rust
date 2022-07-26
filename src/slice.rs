@@ -29,15 +29,51 @@ use std::str;
 
 pub const NULL_SLICE : FLSlice = FLSlice{buf: ptr::null(), size: 0};
 
-
-pub fn as_slice(s: &str) -> FLSlice {
-    return FLSlice{buf: s.as_ptr() as *const c_void,
-                   size: s.len() as u64};
+#[derive(Clone, Copy)]
+pub struct Slice<T> {
+    pub(crate) _ref: FLSlice,
+    _owner: T,
 }
 
-pub fn bytes_as_slice(s: &[u8]) -> FLSlice {
-    return FLSlice{buf: s.as_ptr() as *const c_void,
-                   size: s.len() as u64};
+impl<T> Slice<T> {
+    pub const fn wrap(slice: FLSlice, _owner: T) -> Self {
+        Self {
+            _ref: slice,
+            _owner,
+        }
+    }
+
+    pub fn as_byte_array(&self) -> Option<&[u8]> {
+        unsafe { self._ref.as_byte_array() }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        unsafe { self._ref.as_str() }
+    }
+
+    pub fn to_string(&self) -> Option<String> {
+        unsafe { self._ref.to_string() }
+    }
+
+    pub fn to_vec(&self) -> Option<Vec<u8>> {
+        unsafe{ self._ref.to_vec() }
+    }
+
+    pub fn map<F, FT>(&self, f : F) -> Option<FT>
+        where F: Fn(&FLSlice)->FT
+    {
+        self._ref.map(f)
+    }
+}
+
+pub fn as_slice(s: &str) -> Slice<&str> {
+    Slice::wrap(FLSlice{buf: s.as_ptr() as *const c_void,
+        size: s.len() as u64 },s)
+}
+
+pub fn bytes_as_slice(s: &[u8]) -> Slice<&[u8]> {
+     Slice::wrap(FLSlice{buf: s.as_ptr() as *const c_void,
+        size: s.len() as u64}, s)
 }
 
 impl FLSlice {
@@ -47,6 +83,7 @@ impl FLSlice {
         if !self { return None }
         return Some(std::slice::from_raw_parts(self.buf as *const u8, self.size as usize))
     }
+
     pub unsafe fn as_str<'a>(&self) -> Option<&'a str> {
         match self.as_byte_array() {
             None    => None,

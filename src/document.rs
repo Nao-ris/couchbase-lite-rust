@@ -76,7 +76,7 @@ impl Database {
             // we always get a mutable CBLDocument,
             // since Rust doesn't let us have MutableDocument subclass.
             let mut error = CBLError::default();
-            let doc = CBLDatabase_GetMutableDocument(self.get_ref(), as_slice(id), &mut error);
+            let doc = CBLDatabase_GetMutableDocument(self.get_ref(), as_slice(id)._ref, &mut error);
             if doc.is_null() {
                 if error.code != 0 {
                     return failure(error);
@@ -185,7 +185,7 @@ impl Database {
     pub fn purge_document_by_id(&mut self, id: &str) -> Result<()> {
         unsafe {
             return check_bool(|error| {
-                CBLDatabase_PurgeDocumentByID(self.get_ref(), as_slice(id), error)
+                CBLDatabase_PurgeDocumentByID(self.get_ref(), as_slice(id)._ref, error)
             });
         }
     }
@@ -197,7 +197,7 @@ impl Database {
         unsafe {
             let mut error = CBLError::default();
             let exp =
-                CBLDatabase_GetDocumentExpiration(self.get_ref(), as_slice(doc_id), &mut error);
+                CBLDatabase_GetDocumentExpiration(self.get_ref(), as_slice(doc_id)._ref, &mut error);
             if exp < 0 {
                 return failure(error);
             } else if exp == 0 {
@@ -216,7 +216,7 @@ impl Database {
         };
         unsafe {
             return check_bool(|error| {
-                CBLDatabase_SetDocumentExpiration(self.get_ref(), as_slice(doc_id), exp, error)
+                CBLDatabase_SetDocumentExpiration(self.get_ref(), as_slice(doc_id)._ref, exp, error)
             });
         }
     }
@@ -255,7 +255,7 @@ impl Document {
     /** Creates a new, empty document in memory, with the given ID.
     It will not be added to a database until saved. */
     pub fn new_with_id(id: &str) -> Self {
-        unsafe { Document::wrap(CBLDocument_CreateWithID(as_slice(id))) }
+        unsafe { Document::wrap(CBLDocument_CreateWithID(as_slice(id)._ref)) }
     }
 
     /** Wrap a CBLDocument as a Document.
@@ -322,7 +322,7 @@ impl Document {
     pub fn set_properties_as_json(&mut self, json: &str) -> Result<()> {
         unsafe {
             let mut err = CBLError::default();
-            let ok = CBLDocument_SetJSON(self._ref, as_slice(json), &mut err);
+            let ok = CBLDocument_SetJSON(self._ref, as_slice(json)._ref, &mut err);
             return check_failure(ok, &err);
         }
     }

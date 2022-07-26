@@ -66,16 +66,28 @@ impl MutableArray {
         unsafe { FLMutableArray_IsChanged(self._ref) }
     }
 
-    pub fn at<'s>(&'s mut self, index: u32) -> Slot<'s> {
-        unsafe { Slot{_ref: FLMutableArray_Set(self._ref, index), _owner: PhantomData} }
+    pub fn at(&mut self, index: u32) -> Option<Slot> {
+        if self.count() > index {
+            Some(unsafe { Slot{_ref: FLMutableArray_Set(self._ref, index), _owner: PhantomData} })
+        } else {
+            None
+        }
     }
 
-    pub fn append<'s>(&'s mut self) -> Slot<'s> {
+    pub fn append(&mut self) -> Slot {
         unsafe { Slot{_ref: FLMutableArray_Append(self._ref), _owner: PhantomData} }
     }
 
-    pub fn insert<'s>(&'s mut self, index: u32) {
-        unsafe { FLMutableArray_Insert(self._ref, index, 1) }
+    pub fn insert(&mut self, index: u32) -> Result<()> {
+        if self.count() > index {
+            unsafe { FLMutableArray_Insert(self._ref, index, 1) }
+            Ok(())
+        } else {
+            Err(Error {
+                code: ErrorCode::CouchbaseLite(CouchbaseLiteError::MemoryError),
+                internal_info: None
+            })
+        }
     }
 
     pub fn remove(&mut self, index: u32) {
@@ -193,11 +205,11 @@ impl MutableDict {
     }
 
     pub fn at<'s>(&'s mut self, key: &str) -> Slot<'s> {
-        unsafe { Slot{_ref: FLMutableDict_Set(self._ref, as_slice(key)), _owner: PhantomData} }
+        unsafe { Slot{_ref: FLMutableDict_Set(self._ref, as_slice(key)._ref), _owner: PhantomData} }
     }
 
     pub fn remove(&mut self, key: &str) {
-        unsafe { FLMutableDict_Remove(self._ref, as_slice(key)) }
+        unsafe { FLMutableDict_Remove(self._ref, as_slice(key)._ref) }
     }
 
     pub fn remove_all(&mut self) {
@@ -212,7 +224,7 @@ impl MutableDict {
 
     pub fn set_encryptable_value(dict: MutableDict, key: String, encryptable: Encryptable) {
         unsafe {
-            FLSlot_SetEncryptableValue(FLMutableDict_Set(dict._ref, as_slice(&key)), encryptable.get_ref());
+            FLSlot_SetEncryptableValue(FLMutableDict_Set(dict._ref, as_slice(&key)._ref), encryptable.get_ref());
         }
     }
 
@@ -324,11 +336,11 @@ impl<'s> Slot<'s> {
     }
 
     pub fn put_string<STR: AsRef<str>>(self, value: STR) {
-        unsafe { FLSlot_SetString(self._ref, as_slice(value.as_ref())) }
+        unsafe { FLSlot_SetString(self._ref, as_slice(value.as_ref())._ref) }
     }
 
     pub fn put_data<DATA: AsRef<[u8]>>(self, value: DATA) {
-        unsafe { FLSlot_SetString(self._ref, bytes_as_slice(value.as_ref())) }
+        unsafe { FLSlot_SetString(self._ref, bytes_as_slice(value.as_ref())._ref) }
     }
 
     pub fn put_value<VALUE: FleeceReference>(self, value: &VALUE)  {

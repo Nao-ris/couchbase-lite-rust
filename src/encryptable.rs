@@ -50,7 +50,7 @@ impl Encryptable {
     pub fn create_with_string(value: String) -> Encryptable {
         unsafe {
             let slice = as_slice(value.as_str());
-            let copy_slice = FLSlice_Copy(slice);
+            let copy_slice = FLSlice_Copy(slice._ref);
             let final_slice = copy_slice.as_slice();
             CBLEncryptable_CreateWithString(final_slice).into()
         }

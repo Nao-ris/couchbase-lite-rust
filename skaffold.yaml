@@ -1,0 +1,17 @@
+apiVersion: skaffold/v2beta27
+kind: Config
+build:
+  artifacts:
+  - image: couchbase-lite-test
+test:
+  - image: couchbase-lite-test
+    custom:
+      - command: cargo t
+        timeoutSeconds: 60
+        dependencies:
+          paths:
+          -  "*.rs"
+deploy:
+  kubectl:
+    manifests:
+      - k8s*

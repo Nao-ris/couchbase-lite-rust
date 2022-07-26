@@ -31,7 +31,7 @@ pub mod logging;
 pub mod query;
 pub mod replicator;
 
-mod slice;
+pub mod slice;
 mod c_api;
 
 use self::c_api::*;

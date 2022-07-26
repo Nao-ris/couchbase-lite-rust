@@ -43,7 +43,7 @@ impl Endpoint {
     pub fn new_with_url(url: String) -> Result<Self> {
         unsafe {
             let mut error = CBLError::default();
-            let endpoint: *mut CBLEndpoint = CBLEndpoint_CreateWithURL(as_slice(&url), &mut error as *mut CBLError);
+            let endpoint: *mut CBLEndpoint = CBLEndpoint_CreateWithURL(as_slice(&url)._ref, &mut error as *mut CBLError);
 
             check_error(&error).and_then(|()| {
                 Ok(Self { _ref: retain(endpoint) })
@@ -75,7 +75,7 @@ impl Authenticator {
     pub fn create_password(username: String, password: String) -> Self {
         unsafe {
             Self {
-                _ref: retain(CBLAuth_CreatePassword(as_slice(&username), as_slice(&password)))
+                _ref: retain(CBLAuth_CreatePassword(as_slice(&username)._ref, as_slice(&password)._ref))
             }
         }
     }
@@ -83,7 +83,7 @@ impl Authenticator {
     pub fn create_session(session_id: String, cookie_name: String) -> Self {
         unsafe {
             Self {
-                _ref: retain(CBLAuth_CreateSession(as_slice(&session_id), as_slice(&cookie_name)))
+                _ref: retain(CBLAuth_CreateSession(as_slice(&session_id)._ref, as_slice(&cookie_name)._ref))
             }
         }
     }
@@ -169,10 +169,10 @@ impl From<ProxySettings> for CBLProxySettings {
     fn from(proxy_settings: ProxySettings) -> Self {
         CBLProxySettings {
             type_: proxy_settings.proxy_type.into(),
-            hostname: proxy_settings.hostname.map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() }).unwrap_or(slice::NULL_SLICE),
+            hostname: proxy_settings.hostname.map(|s| unsafe { FLSlice_Copy(as_slice(&s)._ref).as_slice() }).unwrap_or(slice::NULL_SLICE),
             port: proxy_settings.port,
-            username: proxy_settings.username.map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() }).unwrap_or(slice::NULL_SLICE),
-            password: proxy_settings.password.map(|s| unsafe { FLSlice_Copy(as_slice(&s)).as_slice() }).unwrap_or(slice::NULL_SLICE),
+            username: proxy_settings.username.map(|s| unsafe { FLSlice_Copy(as_slice(&s)._ref).as_slice() }).unwrap_or(slice::NULL_SLICE),
+            password: proxy_settings.password.map(|s| unsafe { FLSlice_Copy(as_slice(&s)._ref).as_slice() }).unwrap_or(slice::NULL_SLICE),
         }
     }
 }
@@ -292,7 +292,7 @@ pub extern "C" fn c_property_encryptor(
                     &error,
                 )
             })
-            .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])))
+            .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])._ref))
             .unwrap_or(FLSliceResult_New(0));
 
         if !cbl_error.is_null() {
@@ -343,7 +343,7 @@ pub extern "C" fn c_property_decryptor(
                     &error,
                 )
             })
-            .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])))
+            .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])._ref))
             .unwrap_or(FLSliceResult_New(0));
 
         if !cbl_error.is_null() {
@@ -464,8 +464,8 @@ impl<'c> From<ReplicatorConfiguration<'c>> for CBLReplicatorConfiguration {
                 authenticator: config.authenticator.map(|a| a._ref).unwrap_or(ptr::null_mut()),
                 proxy: proxy,
                 headers: MutableDict::from_hashmap(&config.headers).as_dict()._ref,
-                pinnedServerCertificate: config.pinned_server_certificate.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
-                trustedRootCertificates: config.trusted_root_certificates.map(|c| slice::bytes_as_slice(c)).unwrap_or(slice::NULL_SLICE),
+                pinnedServerCertificate: config.pinned_server_certificate.map(|c| slice::bytes_as_slice(c)._ref).unwrap_or(slice::NULL_SLICE),
+                trustedRootCertificates: config.trusted_root_certificates.map(|c| slice::bytes_as_slice(c)._ref).unwrap_or(slice::NULL_SLICE),
                 channels: config.channels._ref,
                 documentIDs: config.document_ids._ref,
                 pushFilter: (*context).push_filter.and(Some(c_replication_push_filter)),
@@ -726,7 +726,7 @@ impl Replicator {
     pub fn is_document_pending(&self, doc_id: &str) -> Result<bool> {
         unsafe {
             let mut error = CBLError::default();
-            let result = CBLReplicator_IsDocumentPending(self._ref, as_slice(doc_id), &mut error as *mut CBLError);
+            let result = CBLReplicator_IsDocumentPending(self._ref, as_slice(doc_id)._ref, &mut error as *mut CBLError);
 
             check_error(&error).and_then(|()| {
                 Ok(result)

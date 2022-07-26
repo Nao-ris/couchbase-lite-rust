@@ -161,3 +161,79 @@ fn mutable_dict_to_from_hash_map() {
     assert_eq!(new_dict.get("id1").as_string(), Some("value1"));
     assert_eq!(new_dict.get("id2").as_string(), Some("value2"));
 }
+
+#[test]
+fn dict_exact_size_iterator() {
+    let mut mut_dict = MutableDict::new();
+    mut_dict.at("1").put_string("value1");
+    mut_dict.at("2").put_string("value2");
+    let dict = mut_dict.as_dict();
+    let mut dict_iter = dict.iter();
+    dict_iter.next();
+    assert_eq!(DictIterator::count(&dict_iter), 1);
+    assert_eq!(dict_iter.len(), 2);
+}
+
+#[test]
+fn dict_from_iterator() {
+    let dict: MutableDict = Fleece::parse_json(r#"{"1": "value1","f":12.34}"#).unwrap().as_dict().iter().collect();
+
+    assert_eq!(dict.count(), 2);
+    assert_eq!(
+        dict.get("1").as_string(),
+        Some("value1")
+    );
+
+    let mut mut_dict = MutableDict::new();
+    mut_dict.at("1").put_string("value1");
+    mut_dict.at("2").put_string("value2");
+
+    let dict: MutableDict = mut_dict.as_dict().iter().collect();
+    assert_eq!(dict.count(), 2);
+    assert_eq!(
+        dict.get("1").as_string(),
+        Some("value1")
+    );
+}
+
+#[test]
+fn array_at() {
+    let mut mut_arr = MutableArray::new();
+    assert!(mut_arr.at(0).is_none());
+    mut_arr.append().put_string("value1");
+    assert!(mut_arr.at(0).is_some());
+}
+
+#[test]
+fn array_exact_size_iterator() {
+    let mut mut_arr = MutableArray::new();
+    mut_arr.append().put_string("value1");
+    mut_arr.append().put_string("value2");
+    let arr = mut_arr.as_array();
+    let mut arr_iter = arr.iter();
+    arr_iter.next();
+    assert_eq!(ArrayIterator::count(&arr_iter), 1);
+    assert_eq!(arr_iter.len(), 2);
+}
+
+#[test]
+fn array_from_iterator() {
+    let arr: MutableArray = Fleece::parse_json(r#"["value1","value2"]"#).unwrap().as_array().iter().collect();
+
+    assert_eq!(arr.count(), 2);
+    assert_eq!(
+        arr.get(0).as_string(),
+        Some("value1")
+    );
+
+    let mut mut_arr = MutableArray::new();
+    mut_arr.append().put_string("value1");
+    mut_arr.append().put_string("value2");
+
+    let arr: MutableArray = mut_arr.as_array().iter().collect();
+    assert_eq!(arr.count(), 2);
+    assert_eq!(
+        arr.get(0).as_string(),
+        Some("value1")
+    );
+}
