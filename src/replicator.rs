@@ -292,7 +292,7 @@ pub type PropertyEncryptor = fn(
     error: &Error,
 ) -> Vec<u8>;
 #[no_mangle]
-pub extern "C" fn c_property_encryptor(
+pub unsafe extern "C" fn c_property_encryptor(
     context: *mut ::std::os::raw::c_void,
     document_id: FLString,
     properties: FLDict,
@@ -302,36 +302,33 @@ pub extern "C" fn c_property_encryptor(
     kid: *mut FLStringResult,
     cbl_error: *mut CBLError,
 ) -> FLSliceResult {
-    unsafe {
-        let repl_conf_context: *const ReplicationConfigurationContext =
-            std::mem::transmute(context);
+    let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
-        let error = cbl_error
-            .as_ref()
-            .map(Error::new)
-            .unwrap_or(Error::default());
+    let error = cbl_error
+        .as_ref()
+        .map(Error::new)
+        .unwrap_or(Error::default());
 
-        let result = (*repl_conf_context)
-            .property_encryptor
-            .map(|callback| {
-                callback(
-                    document_id.to_string(),
-                    Dict::wrap(properties, &properties),
-                    key_path.to_string(),
-                    input.to_vec(),
-                    algorithm.as_ref().and_then(|s| s.to_string()),
-                    kid.as_ref().and_then(|s| s.to_string()),
-                    &error,
-                )
-            })
-            .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])._ref))
-            .unwrap_or(FLSliceResult_New(0));
+    let result = (*repl_conf_context)
+        .property_encryptor
+        .map(|callback| {
+            callback(
+                document_id.to_string(),
+                Dict::wrap(properties, &properties),
+                key_path.to_string(),
+                input.to_vec(),
+                algorithm.as_ref().and_then(|s| s.to_string()),
+                kid.as_ref().and_then(|s| s.to_string()),
+                &error,
+            )
+        })
+        .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])._ref))
+        .unwrap_or(FLSliceResult_New(0));
 
-        if !cbl_error.is_null() {
-            *cbl_error = error.as_cbl_error();
-        }
-        result
+    if !cbl_error.is_null() {
+        *cbl_error = error.as_cbl_error();
     }
+    result
 }
 
 /** Callback that decrypts encrypted encryptable properties in documents pulled by the replicator.
@@ -348,7 +345,7 @@ pub type PropertyDecryptor = fn(
     error: &Error,
 ) -> Vec<u8>;
 #[no_mangle]
-pub extern "C" fn c_property_decryptor(
+pub unsafe extern "C" fn c_property_decryptor(
     context: *mut ::std::os::raw::c_void,
     document_id: FLString,
     properties: FLDict,
@@ -358,36 +355,33 @@ pub extern "C" fn c_property_decryptor(
     kid: FLString,
     cbl_error: *mut CBLError,
 ) -> FLSliceResult {
-    unsafe {
-        let repl_conf_context: *const ReplicationConfigurationContext =
-            std::mem::transmute(context);
+    let repl_conf_context: *const ReplicationConfigurationContext = std::mem::transmute(context);
 
-        let error = cbl_error
-            .as_ref()
-            .map(Error::new)
-            .unwrap_or(Error::default());
+    let error = cbl_error
+        .as_ref()
+        .map(Error::new)
+        .unwrap_or(Error::default());
 
-        let result = (*repl_conf_context)
-            .property_decryptor
-            .map(|callback| {
-                callback(
-                    document_id.to_string(),
-                    Dict::wrap(properties, &properties),
-                    key_path.to_string(),
-                    input.to_vec(),
-                    algorithm.to_string(),
-                    kid.to_string(),
-                    &error,
-                )
-            })
-            .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])._ref))
-            .unwrap_or(FLSliceResult_New(0));
+    let result = (*repl_conf_context)
+        .property_decryptor
+        .map(|callback| {
+            callback(
+                document_id.to_string(),
+                Dict::wrap(properties, &properties),
+                key_path.to_string(),
+                input.to_vec(),
+                algorithm.to_string(),
+                kid.to_string(),
+                &error,
+            )
+        })
+        .map(|v| FLSlice_Copy(bytes_as_slice(&v[..])._ref))
+        .unwrap_or(FLSliceResult_New(0));
 
-        if !cbl_error.is_null() {
-            *cbl_error = error.as_cbl_error();
-        }
-        result
+    if !cbl_error.is_null() {
+        *cbl_error = error.as_cbl_error();
     }
+    result
 }
 
 struct ReplicationConfigurationContext {
