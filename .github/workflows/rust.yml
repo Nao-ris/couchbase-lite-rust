@@ -8,9 +8,7 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - name: Install apt-get
       run: sudo apt-get install -y clang
@@ -18,4 +16,4 @@ jobs:
     - name: Build
       run: cargo build --verbose
     - name: Run tests (with address sanitizer)
-      run: LSAN_OPTIONS=suppressions=san.supp RUSTFLAGS="-Zsanitizer=address" cargo test --verbose
+      run: LSAN_OPTIONS=suppressions=san.supp RUSTFLAGS="-Zsanitizer=address" cargo +nightly test --verbose
