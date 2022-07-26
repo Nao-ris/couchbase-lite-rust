@@ -147,6 +147,23 @@ fn main() {
         println!("cargo:rustc-link-lib=dylib=cblite");
     }
 
+    if cfg!(target_os = "linux") {
+        let dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        println!(
+            "cargo:rustc-link-search=all={}",
+            std::path::Path::new(&dir)
+                .join("libcblite-3.0.1/lib")
+                .display()
+        );
+
+        println!(
+            "cargo:rustc-env=LD_LIBRARY_PATH={}",
+            std::path::Path::new(&dir)
+                .join("libcblite-3.0.1/lib")
+                .display()
+        );
+    }
+
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=src/wrapper.h");
 }
