@@ -1,5 +1,10 @@
 on: push
 name: Clippy check
+
+env:
+  CARGO_TERM_COLOR: always
+  LIBCLANG_PATH: /usr/lib/llvm-11/lib/
+
 jobs:
   clippy_check:
     runs-on: ubuntu-latest
