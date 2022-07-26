@@ -29,8 +29,10 @@ pub mod utils;
 
 //////// TESTS:
 
-#[cfg(feature = "concurrency-test")]
-mod concurrency {
+#[cfg(feature = "flaky-test")]
+mod flaky {
+    use super::*;
+
     #[test]
     fn config() {
         utils::with_db(|db| {

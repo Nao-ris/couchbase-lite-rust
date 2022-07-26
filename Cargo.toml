@@ -23,4 +23,4 @@ incremental = false
 # See: https://github.com/johnthagen/min-sized-rust
 
 [features]
-concurrency-test = []
+flaky-test = []

@@ -67,34 +67,34 @@ fn db_properties() {
     });
 }
 
-#[cfg(feature = "concurrency-test")]
-mod concurrency {
-    use super::*;
+#[test]
+fn add_listener() {
+    utils::set_static(&DOCUMENT_DETECTED, false);
 
-    #[test]
-    fn add_listener() {
-        utils::set_static(&DOCUMENT_DETECTED, false);
-
-        utils::with_db(|db| {
-            let listener_token = db.add_listener(|_, doc_ids| {
-                if doc_ids.first().unwrap() == "document" {
-                    utils::set_static(&DOCUMENT_DETECTED, true);
-                }
-            });
-
-            let mut doc = Document::new_with_id("document");
-            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
-                .unwrap();
-
-            assert!(utils::check_static_with_wait(
-                &DOCUMENT_DETECTED,
-                true,
-                None
-            ));
-
-            drop(listener_token);
+    utils::with_db(|db| {
+        let listener_token = db.add_listener(|_, doc_ids| {
+            if doc_ids.first().unwrap() == "document" {
+                utils::set_static(&DOCUMENT_DETECTED, true);
+            }
         });
-    }
+
+        let mut doc = Document::new_with_id("document");
+        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+            .unwrap();
+
+        assert!(utils::check_static_with_wait(
+            &DOCUMENT_DETECTED,
+            true,
+            None
+        ));
+
+        drop(listener_token);
+    });
+}
+
+#[cfg(feature = "flaky-test")]
+mod flaky {
+    use super::*;
 
     #[test]
     fn buffer_notifications() {

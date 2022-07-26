@@ -39,10 +39,15 @@ This tells the crate where to find Couchbase Lite's headers and library, and the
 counting the number of extant Couchbase Lite objects before and after it runs, and failing if the
 number increases. That works only if a single test runs at a time.
 
-    $ cargo test -- --test-threads 1
+    $ LEAK_CHECK=y cargo test -- --test-threads 1
 
-The library itself has no thread-safety problems; if you want to run the tests multi-threaded, just
-edit `tests/simple_tests.rs` and change the value of `LEAK_CHECKS` to `false`.
+### 6. Sanitizer
+
+    $ LSAN_OPTIONS=suppressions=san.supp RUSTFLAGS="-Zsanitizer=address" cargo +nightly test 
+
+**To diag flaky test** 
+
+    $ LSAN_OPTIONS=suppressions=san.supp RUSTFLAGS="-Zsanitizer=address" cargo +nightly test --verbose --features=flaky-test flaky
 
 ## Learning
 
