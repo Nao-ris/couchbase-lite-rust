@@ -1,4 +1,3 @@
-
 extern crate couchbase_lite;
 extern crate tempdir;
 
@@ -8,26 +7,27 @@ use self::tempdir::TempDir;
 use std::{
     collections::HashMap,
     ptr,
-    sync::{Arc, Mutex, MutexGuard },
+    sync::{Arc, Mutex, MutexGuard},
     thread, time,
 };
 
 // Enables check for leaks of native CBL objects after `with_db()` finishes.
 // WARNING: These checks only work if one test method runs at a time, i.e. testing is single
 //          threaded. Run as `cargo test -- --test-threads=1` or you'll get false positives.
-const LEAK_CHECKS : bool = true;
+const LEAK_CHECKS: bool = true;
 
-pub const DB_NAME : &str = "test_db";
+pub const DB_NAME: &str = "test_db";
 
-const LEVEL_PREFIX : [&str;5] = ["((", "_", "", "WARNING: ", "***ERROR: "];
-const LEVEL_SUFFIX : [&str;5] = ["))", "_", "", "",          " ***"];
+const LEVEL_PREFIX: [&str; 5] = ["((", "_", "", "WARNING: ", "***ERROR: "];
+const LEVEL_SUFFIX: [&str; 5] = ["))", "_", "", "", " ***"];
 
 fn logger(domain: logging::Domain, level: logging::Level, message: &str) {
     // Log to stdout, not stderr, so that `cargo test` will buffer the output.
     let i = level as usize;
-    println!("CBL {:?}: {}{}{}",
-             domain, LEVEL_PREFIX[i], message, LEVEL_SUFFIX[i])
-
+    println!(
+        "CBL {:?}: {}{}{}",
+        domain, LEVEL_PREFIX[i], message, LEVEL_SUFFIX[i]
+    )
 }
 
 fn init_logging() {
@@ -38,13 +38,14 @@ fn init_logging() {
 
 // Test wrapper function -- takes care of creating and deleting the database.
 pub fn with_db<F>(f: F)
-    where F: Fn(&mut Database)
+where
+    F: Fn(&mut Database),
 {
     init_logging();
 
     let start_inst_count = instance_count() as isize;
     let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
-    let cfg = DatabaseConfiguration{
+    let cfg = DatabaseConfiguration {
         directory: tmp_dir.path(),
         encryption_key: ptr::null_mut(),
     };
@@ -57,8 +58,11 @@ pub fn with_db<F>(f: F)
     if LEAK_CHECKS && instance_count() as isize > start_inst_count {
         warn!("Couchbase Lite objects were leaked by this test");
         dump_instances();
-        panic!("Native object leak: {} objects, was {}",
-            instance_count(), start_inst_count);
+        panic!(
+            "Native object leak: {} objects, was {}",
+            instance_count(),
+            start_inst_count
+        );
         // NOTE: This failure is likely to happen if the tests run multi-threaded, as happens by
         // default. Looking for changes in the `instance_count()` is intrinsically not thread safe.
         // Either run tests with `cargo test -- --test-threads`, or turn off `LEAK_CHECKS`.
@@ -92,7 +96,11 @@ impl<'a> Default for ReplicationTestConfiguration<'a> {
     }
 }
 
-fn generate_replication_configuration<'a>(local_db: &Database, central_db: &Database, config: ReplicationTestConfiguration<'a>) -> ReplicatorConfiguration<'a> {
+fn generate_replication_configuration<'a>(
+    local_db: &Database,
+    central_db: &Database,
+    config: ReplicationTestConfiguration<'a>,
+) -> ReplicatorConfiguration<'a> {
     ReplicatorConfiguration {
         database: local_db.clone(),
         endpoint: Endpoint::new_with_local_db(central_db),
@@ -117,22 +125,26 @@ fn generate_replication_configuration<'a>(local_db: &Database, central_db: &Data
     }
 }
 
-pub fn with_three_dbs<F>(config1: ReplicationTestConfiguration, config2: ReplicationTestConfiguration, f: F)
-    where F: Fn(&mut Database, &mut Database, &mut Database, &mut Replicator, &mut Replicator)
+pub fn with_three_dbs<F>(
+    config1: ReplicationTestConfiguration,
+    config2: ReplicationTestConfiguration,
+    f: F,
+) where
+    F: Fn(&mut Database, &mut Database, &mut Database, &mut Replicator, &mut Replicator),
 {
     init_logging();
 
     // Create databases
     let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
-    let cfg1 = DatabaseConfiguration{
+    let cfg1 = DatabaseConfiguration {
         directory: tmp_dir.path(),
         encryption_key: ptr::null_mut(),
     };
-    let cfg2 = DatabaseConfiguration{
+    let cfg2 = DatabaseConfiguration {
         directory: tmp_dir.path(),
         encryption_key: ptr::null_mut(),
     };
-    let cfg3 = DatabaseConfiguration{
+    let cfg3 = DatabaseConfiguration {
         directory: tmp_dir.path(),
         encryption_key: ptr::null_mut(),
     };
@@ -155,7 +167,13 @@ pub fn with_three_dbs<F>(config1: ReplicationTestConfiguration, config2: Replica
     repl2.start(false);
 
     // Callback
-    f(&mut local_db1, &mut local_db2, &mut central_db, &mut repl1, &mut repl2);
+    f(
+        &mut local_db1,
+        &mut local_db2,
+        &mut central_db,
+        &mut repl1,
+        &mut repl2,
+    );
 
     // Clean up
     repl1.stop();
@@ -171,7 +189,8 @@ pub fn add_doc(db: &mut Database, id: &str, i: i64, s: &str) {
     let mut props = doc.mutable_properties();
     props.at("i").put_i64(i);
     props.at("s").put_string(s);
-    db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict).expect("save");
+    db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
+        .expect("save");
 }
 
 // Static
@@ -184,7 +203,9 @@ pub fn get_static<T>(st: &Arc<Mutex<T>>) -> MutexGuard<T> {
     }
 }
 pub fn get_static_value<T>(st: &Arc<Mutex<T>>) -> T
-    where T: Copy {
+where
+    T: Copy,
+{
     if let Ok(st) = st.lock() {
         *st
     } else {
@@ -198,8 +219,14 @@ pub fn set_static<T>(st: &Arc<Mutex<T>>, value: T) {
 pub fn is_static_true(st: &Arc<Mutex<bool>>) -> bool {
     get_static_value(st)
 }
-pub fn check_static_with_wait<T>(st: &Arc<Mutex<T>>, expected_value: T, max_wait_seconds: Option<u64>) -> bool
-    where T: Copy + std::cmp::PartialEq {
+pub fn check_static_with_wait<T>(
+    st: &Arc<Mutex<T>>,
+    expected_value: T,
+    max_wait_seconds: Option<u64>,
+) -> bool
+where
+    T: Copy + std::cmp::PartialEq,
+{
     let max_wait_seconds = time::Duration::from_secs(max_wait_seconds.unwrap_or(10));
     let now = time::Instant::now();
     let wait_time = time::Duration::from_millis(100);
@@ -213,7 +240,9 @@ pub fn check_static_with_wait<T>(st: &Arc<Mutex<T>>, expected_value: T, max_wait
     result
 }
 pub fn check_callback_with_wait<CB>(mut callback: CB, max_wait_seconds: Option<u64>) -> bool
-    where CB: FnMut() -> bool {
+where
+    CB: FnMut() -> bool,
+{
     let max_wait_seconds = time::Duration::from_secs(max_wait_seconds.unwrap_or(10));
     let now = time::Instant::now();
     let wait_time = time::Duration::from_millis(100);

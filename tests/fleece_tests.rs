@@ -70,21 +70,27 @@ fn basic_values() {
     assert_eq!(a.get(1).as_i64(), Some(2));
     assert_eq!(a.get(2).as_i64(), None);
 
-    assert_eq!(doc.root().to_json(), r#"{"a":[1,2],"f":12.34,"i":1234,"s":"Foo"}"#);
-    assert_eq!(format!("{}", doc.root()), r#"{"a":[1,2],"f":12.34,"i":1234,"s":"Foo"}"#);
+    assert_eq!(
+        doc.root().to_json(),
+        r#"{"a":[1,2],"f":12.34,"i":1234,"s":"Foo"}"#
+    );
+    assert_eq!(
+        format!("{}", doc.root()),
+        r#"{"a":[1,2],"f":12.34,"i":1234,"s":"Foo"}"#
+    );
 }
 
 #[test]
 fn nested_borrow_check() {
-    let v : Value;
-    let str : &str;
+    let v: Value;
+    let str: &str;
 
     let doc = Fleece::parse_json(r#"{"i":1234,"f":12.34,"a":[1, 2],"s":"Foo"}"#).unwrap();
     {
         let dict = doc.as_dict();
         v = dict.get("a");
         str = dict.get("s").as_string().unwrap();
-}
+    }
     // It's OK that `dict` has gone out of scope, because `v`s scope is `doc`, not `dict`.
     println!("v = {:?}", v);
     println!("str = {}", str);

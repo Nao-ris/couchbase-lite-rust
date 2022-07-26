@@ -188,7 +188,7 @@ fn database_delete_document() {
     utils::set_static(&DOCUMENT_DETECTED, false);
 
     let config1 = utils::ReplicationTestConfiguration {
-        push_filter: Some(|document, is_deleted, _is_access_removed| { 
+        push_filter: Some(|document, is_deleted, _is_access_removed| {
             if is_deleted && document.id() == "foo" {
                 utils::set_static(&DOCUMENT_DETECTED, true);
             }
@@ -198,22 +198,40 @@ fn database_delete_document() {
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
 
-    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
-        // Save doc 'foo'
-        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, local_db2, central_db, _repl1, _repl2| {
+            // Save doc 'foo'
+            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
-        // Check 'foo' is replicated to central and DB 2
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
-        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
+            // Check 'foo' is replicated to central and DB 2
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+            assert!(utils::check_callback_with_wait(
+                || local_db2.get_document("foo").is_ok(),
+                None
+            ));
 
-        // Delete document in DB 1
-        let document = local_db1.get_document("foo").unwrap();
-        local_db1.delete_document_with_concurency_control(&document, ConcurrencyControl::FailOnConflict)
-            .expect("delete_document");
+            // Delete document in DB 1
+            let document = local_db1.get_document("foo").unwrap();
+            local_db1
+                .delete_document_with_concurency_control(
+                    &document,
+                    ConcurrencyControl::FailOnConflict,
+                )
+                .expect("delete_document");
 
-        // Check document is replicated with deleted flag
-        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
-    });
+            // Check document is replicated with deleted flag
+            assert!(utils::check_static_with_wait(
+                &DOCUMENT_DETECTED,
+                true,
+                None
+            ));
+        },
+    );
 }
 
 #[test]

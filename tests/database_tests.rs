@@ -40,7 +40,8 @@ fn in_transaction() {
     utils::with_db(|db| {
         let result = db.in_transaction(|db| {
             let mut doc = Document::new_with_id("document");
-            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+                .unwrap();
             Ok("document".to_string())
         });
 
@@ -49,7 +50,8 @@ fn in_transaction() {
 
         let result = db.in_transaction(|db| -> Result<String> {
             let mut doc = Document::new_with_id("document_error");
-            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+                .unwrap();
             Err(couchbase_lite::Error::default())
         });
 
@@ -70,16 +72,21 @@ fn add_listener() {
     utils::set_static(&DOCUMENT_DETECTED, false);
 
     utils::with_db(|db| {
-        let listener_token = db.add_listener(| _, doc_ids| {
+        let listener_token = db.add_listener(|_, doc_ids| {
             if doc_ids.first().unwrap() == "document" {
                 utils::set_static(&DOCUMENT_DETECTED, true);
             }
         });
 
         let mut doc = Document::new_with_id("document");
-        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+            .unwrap();
 
-        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
+        assert!(utils::check_static_with_wait(
+            &DOCUMENT_DETECTED,
+            true,
+            None
+        ));
 
         drop(listener_token);
     });
@@ -95,21 +102,34 @@ fn buffer_notifications() {
             utils::set_static(&BUFFER_NOTIFICATIONS, true);
         });
 
-        let listener_token = db.add_listener(| _, doc_ids| {
+        let listener_token = db.add_listener(|_, doc_ids| {
             if doc_ids.first().unwrap() == "document" {
                 utils::set_static(&DOCUMENT_DETECTED, true);
             }
         });
 
         let mut doc = Document::new_with_id("document");
-        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins).unwrap();
+        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+            .unwrap();
 
-        assert!(!utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
-        assert!(utils::check_static_with_wait(&BUFFER_NOTIFICATIONS, true, None));
+        assert!(!utils::check_static_with_wait(
+            &DOCUMENT_DETECTED,
+            true,
+            None
+        ));
+        assert!(utils::check_static_with_wait(
+            &BUFFER_NOTIFICATIONS,
+            true,
+            None
+        ));
 
         db.send_notifications();
 
-        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
+        assert!(utils::check_static_with_wait(
+            &DOCUMENT_DETECTED,
+            true,
+            None
+        ));
 
         drop(listener_token);
     });

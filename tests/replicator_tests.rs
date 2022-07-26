@@ -41,7 +41,10 @@ fn config() {
             max_attempts: 4,
             max_attempt_wait_time: 100,
             heartbeat: 120,
-            authenticator: Some(Authenticator::create_session("session_id".to_string(), "cookie_name".to_string())),
+            authenticator: Some(Authenticator::create_session(
+                "session_id".to_string(),
+                "cookie_name".to_string(),
+            )),
             proxy: Some(ProxySettings {
                 proxy_type: ProxyType::HTTP,
                 hostname: Some("hostname".to_string()),
@@ -87,16 +90,26 @@ fn basic_local_replication() {
     let config1: utils::ReplicationTestConfiguration = Default::default();
     let config2: utils::ReplicationTestConfiguration = Default::default();
 
-    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
-        // Save doc
-        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, local_db2, central_db, _repl1, _repl2| {
+            // Save doc
+            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
-        // Check if replication to central
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+            // Check if replication to central
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
 
-        // Check if replication to DB 2
-        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
-    });
+            // Check if replication to DB 2
+            assert!(utils::check_callback_with_wait(
+                || local_db2.get_document("foo").is_ok(),
+                None
+            ));
+        },
+    );
 }
 
 #[test]
@@ -107,20 +120,33 @@ fn pull_type_not_pushing() {
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
 
-    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
-        // Save doc in DB 1
-        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, local_db2, central_db, _repl1, _repl2| {
+            // Save doc in DB 1
+            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
-        // Check the replication process is not pushing to central
-        assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+            // Check the replication process is not pushing to central
+            assert!(!utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
 
-        // Save doc in DB 2
-        utils::add_doc(local_db2, "foo2", 1234, "Hello World!");
+            // Save doc in DB 2
+            utils::add_doc(local_db2, "foo2", 1234, "Hello World!");
 
-        // Check 'foo2' is pulled in DB 1
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo2").is_ok(), None));
-        assert!(utils::check_callback_with_wait(|| local_db1.get_document("foo2").is_ok(), None));
-    });
+            // Check 'foo2' is pulled in DB 1
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo2").is_ok(),
+                None
+            ));
+            assert!(utils::check_callback_with_wait(
+                || local_db1.get_document("foo2").is_ok(),
+                None
+            ));
+        },
+    );
 }
 
 #[test]
@@ -131,22 +157,35 @@ fn push_type_not_pulling() {
         ..Default::default()
     };
 
-    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
-        // Save doc in DB 1
-        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, local_db2, central_db, _repl1, _repl2| {
+            // Save doc in DB 1
+            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
-        // Check if replication to central
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+            // Check if replication to central
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
 
-        // Check the replication process is not pulling to DB 2
-        assert!(!utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
+            // Check the replication process is not pulling to DB 2
+            assert!(!utils::check_callback_with_wait(
+                || local_db2.get_document("foo").is_ok(),
+                None
+            ));
 
-        // Save doc in DB 2
-        utils::add_doc(local_db2, "foo2", 1234, "Hello World!");
+            // Save doc in DB 2
+            utils::add_doc(local_db2, "foo2", 1234, "Hello World!");
 
-        // Check 'foo2' is pushed in central
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo2").is_ok(), None));
-    });
+            // Check 'foo2' is pushed in central
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo2").is_ok(),
+                None
+            ));
+        },
+    );
 }
 
 #[test]
@@ -157,19 +196,29 @@ fn continuous() {
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
 
-    utils::with_three_dbs(config1, config2, |local_db1, _local_db2, central_db, repl1, _repl2| {
-        // Save doc
-        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, _local_db2, central_db, repl1, _repl2| {
+            // Save doc
+            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
 
-        // Check the replication process is not running automatically
-        assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+            // Check the replication process is not running automatically
+            assert!(!utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
 
-        // Manually trigger the replication
-        repl1.start(false);
+            // Manually trigger the replication
+            repl1.start(false);
 
-        // Check the replication was successful
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
-    });
+            // Check the replication was successful
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+        },
+    );
 }
 
 #[test]
@@ -183,43 +232,76 @@ fn document_ids() {
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
 
-    utils::with_three_dbs(config1, config2, |local_db1, _local_db2, central_db, _repl1, _repl2| {
-        // Save doc 'foo' and 'foo2'
-        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
-        utils::add_doc(local_db1, "foo2", 1234, "Hello World!");
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, _local_db2, central_db, _repl1, _repl2| {
+            // Save doc 'foo' and 'foo2'
+            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+            utils::add_doc(local_db1, "foo2", 1234, "Hello World!");
 
-        // Check only foo is replicated
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
-        assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo2").is_ok(), None));
-    });
+            // Check only foo is replicated
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+            assert!(!utils::check_callback_with_wait(
+                || central_db.get_document("foo2").is_ok(),
+                None
+            ));
+        },
+    );
 }
 
 #[test]
 fn push_and_pull_filter() {
     let config1 = utils::ReplicationTestConfiguration {
-        push_filter: Some(|document, _is_deleted, _is_access_removed| document.id() == "foo" || document.id() == "foo2"),
+        push_filter: Some(|document, _is_deleted, _is_access_removed| {
+            document.id() == "foo" || document.id() == "foo2"
+        }),
         ..Default::default()
     };
     let config2 = utils::ReplicationTestConfiguration {
-        pull_filter: Some(|document, _is_deleted, _is_access_removed| document.id() == "foo2" || document.id() == "foo3"),
+        pull_filter: Some(|document, _is_deleted, _is_access_removed| {
+            document.id() == "foo2" || document.id() == "foo3"
+        }),
         ..Default::default()
     };
 
-    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
-        // Save doc 'foo', 'foo2' & 'foo3'
-        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
-        utils::add_doc(local_db1, "foo2", 1234, "Hello World!");
-        utils::add_doc(local_db1, "foo3", 1234, "Hello World!");
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, local_db2, central_db, _repl1, _repl2| {
+            // Save doc 'foo', 'foo2' & 'foo3'
+            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+            utils::add_doc(local_db1, "foo2", 1234, "Hello World!");
+            utils::add_doc(local_db1, "foo3", 1234, "Hello World!");
 
-        // Check only 'foo' and 'foo2' were replicated to central
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo2").is_ok(), None));
-        assert!(!utils::check_callback_with_wait(|| central_db.get_document("foo3").is_ok(), None));
+            // Check only 'foo' and 'foo2' were replicated to central
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo2").is_ok(),
+                None
+            ));
+            assert!(!utils::check_callback_with_wait(
+                || central_db.get_document("foo3").is_ok(),
+                None
+            ));
 
-        // Check only foo2' were replicated to DB 2
-        assert!(!utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
-        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo2").is_ok(), None));
-    });
+            // Check only foo2' were replicated to DB 2
+            assert!(!utils::check_callback_with_wait(
+                || local_db2.get_document("foo").is_ok(),
+                None
+            ));
+            assert!(utils::check_callback_with_wait(
+                || local_db2.get_document("foo2").is_ok(),
+                None
+            ));
+        },
+    );
 }
 
 lazy_static! {
@@ -239,43 +321,79 @@ fn conflict_resolver() {
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
 
-    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, repl1, _repl2| {
-        let i = 1234;
-        let i1 = 1;
-        let i2 = 2;
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, local_db2, central_db, repl1, _repl2| {
+            let i = 1234;
+            let i1 = 1;
+            let i2 = 2;
 
-        // Save doc 'foo'
-        utils::add_doc(local_db1, "foo", i, "Hello World!");
+            // Save doc 'foo'
+            utils::add_doc(local_db1, "foo", i, "Hello World!");
 
-        // Check 'foo' is replicated to central and DB 2
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
-        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
+            // Check 'foo' is replicated to central and DB 2
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+            assert!(utils::check_callback_with_wait(
+                || local_db2.get_document("foo").is_ok(),
+                None
+            ));
 
-        // Stop replication on DB 1
-        repl1.stop();
+            // Stop replication on DB 1
+            repl1.stop();
 
-        // Modify 'foo' in DB 1
-        let mut foo = local_db1.get_document("foo").unwrap();
-        foo.mutable_properties().at("i").put_i64(i1);
-        local_db1.save_document_with_concurency_control(&mut foo, ConcurrencyControl::FailOnConflict).expect("save");
+            // Modify 'foo' in DB 1
+            let mut foo = local_db1.get_document("foo").unwrap();
+            foo.mutable_properties().at("i").put_i64(i1);
+            local_db1
+                .save_document_with_concurency_control(&mut foo, ConcurrencyControl::FailOnConflict)
+                .expect("save");
 
-        // Modify 'foo' in DB 2
-        let mut foo = local_db2.get_document("foo").unwrap();
-        foo.mutable_properties().at("i").put_i64(i2);
-        local_db2.save_document_with_concurency_control(&mut foo, ConcurrencyControl::FailOnConflict).expect("save");
+            // Modify 'foo' in DB 2
+            let mut foo = local_db2.get_document("foo").unwrap();
+            foo.mutable_properties().at("i").put_i64(i2);
+            local_db2
+                .save_document_with_concurency_control(&mut foo, ConcurrencyControl::FailOnConflict)
+                .expect("save");
 
-        // Check DB 2 version is in central
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").unwrap().properties().get("i").as_i64_or_0() == i2, None));
+            // Check DB 2 version is in central
+            assert!(utils::check_callback_with_wait(
+                || central_db
+                    .get_document("foo")
+                    .unwrap()
+                    .properties()
+                    .get("i")
+                    .as_i64_or_0()
+                    == i2,
+                None
+            ));
 
-        // Restart DB 1 replication
-        repl1.start(false);
+            // Restart DB 1 replication
+            repl1.start(false);
 
-        // Check conflict was detected
-        assert!(utils::check_static_with_wait(&CONFLICT_DETECTED, true, None));
+            // Check conflict was detected
+            assert!(utils::check_static_with_wait(
+                &CONFLICT_DETECTED,
+                true,
+                None
+            ));
 
-        // Check DB 2 version is in DB 1
-        assert!(utils::check_callback_with_wait(|| local_db1.get_document("foo").unwrap().properties().get("i").as_i64_or_0() == i2, None));
-    });
+            // Check DB 2 version is in DB 1
+            assert!(utils::check_callback_with_wait(
+                || local_db1
+                    .get_document("foo")
+                    .unwrap()
+                    .properties()
+                    .get("i")
+                    .as_i64_or_0()
+                    == i2,
+                None
+            ));
+        },
+    );
 }
 
 fn encryptor(
@@ -285,9 +403,11 @@ fn encryptor(
     input: Option<Vec<u8>>,
     _algorithm: Option<String>,
     _kid: Option<String>,
-    _error: &Error
+    _error: &Error,
 ) -> Vec<u8> {
-    input.map(|v| v.iter().map(|u| u ^ 48).collect()).unwrap_or(vec!())
+    input
+        .map(|v| v.iter().map(|u| u ^ 48).collect())
+        .unwrap_or(vec![])
 }
 fn decryptor(
     _document_id: Option<String>,
@@ -296,9 +416,11 @@ fn decryptor(
     input: Option<Vec<u8>>,
     _algorithm: Option<String>,
     _kid: Option<String>,
-    _error: &Error
+    _error: &Error,
 ) -> Vec<u8> {
-    input.map(|v| v.iter().map(|u| u ^ 48).collect()).unwrap_or(vec!())
+    input
+        .map(|v| v.iter().map(|u| u ^ 48).collect())
+        .unwrap_or(vec![])
 }
 
 #[test]
@@ -314,34 +436,51 @@ fn encryption_decryption() {
         ..Default::default()
     };
 
-    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
-        // Save doc 'foo' with an encryptable property
-        {
-            let mut doc_db1 = Document::new_with_id("foo");
-            let mut props = doc_db1.mutable_properties();
-            props.at("i").put_i64(1234);
-            props.at("s").put_encrypt(&Encryptable::create_with_string("test_encryption".to_string()));
-            local_db1.save_document_with_concurency_control(&mut doc_db1, ConcurrencyControl::FailOnConflict).expect("save");
-        }
+    utils::with_three_dbs(
+        config1,
+        config2,
+        |local_db1, local_db2, central_db, _repl1, _repl2| {
+            // Save doc 'foo' with an encryptable property
+            {
+                let mut doc_db1 = Document::new_with_id("foo");
+                let mut props = doc_db1.mutable_properties();
+                props.at("i").put_i64(1234);
+                props.at("s").put_encrypt(&Encryptable::create_with_string(
+                    "test_encryption".to_string(),
+                ));
+                local_db1
+                    .save_document_with_concurency_control(
+                        &mut doc_db1,
+                        ConcurrencyControl::FailOnConflict,
+                    )
+                    .expect("save");
+            }
 
-        // Check foo is replicated with data encrypted in central
-        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
-        {
-            let doc_central = central_db.get_document("foo").unwrap();
-            let dict = doc_central.properties();
-            assert!(dict.to_keys_hash_set().get("encrypted$s").is_some());
-        }
+            // Check foo is replicated with data encrypted in central
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+            {
+                let doc_central = central_db.get_document("foo").unwrap();
+                let dict = doc_central.properties();
+                assert!(dict.to_keys_hash_set().get("encrypted$s").is_some());
+            }
 
-        // Check foo is replicated with data decrypted in DB 2
-        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
-        {
-            let doc_db2 = local_db2.get_document("foo").unwrap();
-            let dict = doc_db2.properties();
-            let value = dict.get("s");
-            assert!(value.is_encryptable());
-            let encryptable = value.get_encryptable_value();
-            assert!(encryptable.get_value().as_string() == Some("test_encryption"));
-            drop(encryptable);
-        }
-    });
+            // Check foo is replicated with data decrypted in DB 2
+            assert!(utils::check_callback_with_wait(
+                || local_db2.get_document("foo").is_ok(),
+                None
+            ));
+            {
+                let doc_db2 = local_db2.get_document("foo").unwrap();
+                let dict = doc_db2.properties();
+                let value = dict.get("s");
+                assert!(value.is_encryptable());
+                let encryptable = value.get_encryptable_value();
+                assert!(encryptable.get_value().as_string() == Some("test_encryption"));
+                drop(encryptable);
+            }
+        },
+    );
 }

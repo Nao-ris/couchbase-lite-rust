@@ -21,31 +21,27 @@ use super::c_api::*;
 use enum_primitive::FromPrimitive;
 use std::fmt;
 
-
 //////// ERROR STRUCT:
-
 
 /** Error type. Wraps multiple types of errors in an enum. */
 pub struct Error {
     pub code: ErrorCode,
-    pub(crate) internal_info: Option<u32>
+    pub(crate) internal_info: Option<u32>,
 }
-
 
 /** The enum that stores the error domain and code for an Error. */
 #[derive(Debug, PartialEq)]
 pub enum ErrorCode {
-    CouchbaseLite   (CouchbaseLiteError),
-    POSIX           (i32),
-    SQLite          (i32),
-    Fleece          (FleeceError),
-    Network         (NetworkError),
-    WebSocket       (i32)
+    CouchbaseLite(CouchbaseLiteError),
+    POSIX(i32),
+    SQLite(i32),
+    Fleece(FleeceError),
+    Network(NetworkError),
+    WebSocket(i32),
 }
 
 // Redefine `Result` to assume our `Error` type
 pub type Result<T> = std::result::Result<T, Error>;
-
 
 enum_from_primitive! {
     /** Couchbase Lite error codes. */
@@ -126,36 +122,66 @@ enum_from_primitive! {
     }
 }
 
-
 impl Error {
     pub fn default() -> Error {
         Error::new(&CBLError::default())
     }
 
     pub(crate) fn new(err: &CBLError) -> Error {
-        Error{code: ErrorCode::new(err), internal_info: Some(err.internal_info)}
+        Error {
+            code: ErrorCode::new(err),
+            internal_info: Some(err.internal_info),
+        }
     }
 
     pub(crate) fn cbl_error(e: CouchbaseLiteError) -> Error {
-        Error{code: ErrorCode::CouchbaseLite(e), internal_info: None}
+        Error {
+            code: ErrorCode::CouchbaseLite(e),
+            internal_info: None,
+        }
     }
 
     pub(crate) fn fleece_error(e: FLError) -> Error {
-        Error{code: ErrorCode::from_fleece(e), internal_info: None}
+        Error {
+            code: ErrorCode::from_fleece(e),
+            internal_info: None,
+        }
     }
 
     pub(crate) fn as_cbl_error(&self) -> CBLError {
         let domain: u32;
         let code: i32;
         match &self.code {
-            ErrorCode::CouchbaseLite(e) => {domain = kCBLDomain; code = *e as i32;},
-            ErrorCode::Fleece(e) => {domain = kCBLFleeceDomain; code = *e as i32;},
-            ErrorCode::Network(e) => {domain = kCBLNetworkDomain; code = *e as i32;},
-            ErrorCode::POSIX(e) => {domain = kCBLPOSIXDomain; code = *e as i32;},
-            ErrorCode::SQLite(e) => {domain = kCBLSQLiteDomain; code = *e as i32;}
-            ErrorCode::WebSocket(e) => {domain = kCBLWebSocketDomain; code = *e as i32;}
+            ErrorCode::CouchbaseLite(e) => {
+                domain = kCBLDomain;
+                code = *e as i32;
+            }
+            ErrorCode::Fleece(e) => {
+                domain = kCBLFleeceDomain;
+                code = *e as i32;
+            }
+            ErrorCode::Network(e) => {
+                domain = kCBLNetworkDomain;
+                code = *e as i32;
+            }
+            ErrorCode::POSIX(e) => {
+                domain = kCBLPOSIXDomain;
+                code = *e as i32;
+            }
+            ErrorCode::SQLite(e) => {
+                domain = kCBLSQLiteDomain;
+                code = *e as i32;
+            }
+            ErrorCode::WebSocket(e) => {
+                domain = kCBLWebSocketDomain;
+                code = *e as i32;
+            }
         }
-        return CBLError{domain: domain as CBLErrorDomain, code: code, internal_info: self.internal_info.unwrap_or(0)}
+        return CBLError {
+            domain: domain as CBLErrorDomain,
+            code: code,
+            internal_info: self.internal_info.unwrap_or(0),
+        };
     }
 
     pub fn message(&self) -> String {
@@ -168,7 +194,7 @@ impl Error {
     }
 }
 
-impl std::error::Error for Error { }
+impl std::error::Error for Error {}
 
 impl fmt::Debug for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
@@ -182,34 +208,33 @@ impl fmt::Display for Error {
     }
 }
 
-
 impl ErrorCode {
     fn new(err: &CBLError) -> ErrorCode {
         match err.domain as u32 {
             kCBLDomain => {
                 if let Some(e) = CouchbaseLiteError::from_i32(err.code) {
-                    return ErrorCode::CouchbaseLite(e)
+                    return ErrorCode::CouchbaseLite(e);
                 }
             }
             kCBLNetworkDomain => {
                 if let Some(e) = NetworkError::from_i32(err.code as i32) {
-                    return ErrorCode::Network(e)
+                    return ErrorCode::Network(e);
                 }
             }
-            kCBLPOSIXDomain     => return ErrorCode::POSIX(err.code),
-            kCBLSQLiteDomain    => return ErrorCode::SQLite(err.code),
-            kCBLFleeceDomain    => return ErrorCode::from_fleece(err.code as u32),
+            kCBLPOSIXDomain => return ErrorCode::POSIX(err.code),
+            kCBLSQLiteDomain => return ErrorCode::SQLite(err.code),
+            kCBLFleeceDomain => return ErrorCode::from_fleece(err.code as u32),
             kCBLWebSocketDomain => return ErrorCode::WebSocket(err.code),
-            _ => { }
+            _ => {}
         }
         return ErrorCode::untranslatable();
     }
 
     fn from_fleece(fleece_error: u32) -> ErrorCode {
         if let Some(e) = FleeceError::from_u32(fleece_error) {
-            return ErrorCode::Fleece(e)
+            return ErrorCode::Fleece(e);
         }
-        return ErrorCode::untranslatable()
+        return ErrorCode::untranslatable();
     }
 
     fn untranslatable() -> ErrorCode {
@@ -217,24 +242,31 @@ impl ErrorCode {
     }
 }
 
-
 //////// CBLERROR UTILITIES:
 
-
 impl Default for CBLError {
-    fn default() -> CBLError { CBLError{domain: 0, code: 0, internal_info: 0} }
+    fn default() -> CBLError {
+        CBLError {
+            domain: 0,
+            code: 0,
+            internal_info: 0,
+        }
+    }
 }
 
 impl std::ops::Not for CBLError {
     type Output = bool;
-    fn not(self) -> bool {self.code == 0}
+    fn not(self) -> bool {
+        self.code == 0
+    }
 }
 
 impl std::ops::Not for &CBLError {
     type Output = bool;
-    fn not(self) -> bool {self.code == 0}
+    fn not(self) -> bool {
+        self.code == 0
+    }
 }
-
 
 // Convenient way to return a Result from a failed CBLError
 pub(crate) fn failure<T>(err: CBLError) -> Result<T> {
@@ -260,7 +292,8 @@ pub(crate) fn check_error(err: &CBLError) -> Result<()> {
 }
 
 pub(crate) fn check_bool<F>(func: F) -> Result<()>
-    where F: Fn(*mut CBLError)->bool
+where
+    F: Fn(*mut CBLError) -> bool,
 {
     let mut error = CBLError::default();
     let ok = func(&mut error);
@@ -270,28 +303,34 @@ pub(crate) fn check_bool<F>(func: F) -> Result<()>
 // The first parameter is a function that returns a non-null pointer or sets the error.
 // The second parameter is a function that takes the returned pointer and returns the final result.
 pub(crate) fn check_ptr<PTR, F, MAPF, RESULT>(func: F, map: MAPF) -> Result<RESULT>
-    where F: Fn(*mut CBLError)->*mut PTR,
-          MAPF: FnOnce(*mut PTR) -> RESULT
+where
+    F: Fn(*mut CBLError) -> *mut PTR,
+    MAPF: FnOnce(*mut PTR) -> RESULT,
 {
     let mut error = CBLError::default();
     let ptr = func(&mut error);
-    return if ptr.is_null() {failure(error)} else {Ok(map(ptr))};
+    return if ptr.is_null() {
+        failure(error)
+    } else {
+        Ok(map(ptr))
+    };
 }
 
 // The first parameter is a function that returns a non-null pointer or sets the error.
 // The second parameter is a function that takes the returned pointer and returns the final result.
 pub(crate) fn check_io<F>(mut func: F) -> std::io::Result<usize>
-    where F: FnMut(*mut CBLError)->i32
+where
+    F: FnMut(*mut CBLError) -> i32,
 {
     let mut error = CBLError::default();
     let n = func(&mut error);
     if n < 0 {
         // TODO: Better error mapping!
-        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, Error::new(&error)));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            Error::new(&error),
+        ));
     } else {
         return Ok(n as usize);
     }
 }
-
-
-
