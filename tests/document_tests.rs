@@ -179,19 +179,42 @@ fn database_save_document_resolving() {
     });
 }
 
-/*#[test]
+lazy_static! {
+    static ref DOCUMENT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+}
+
+#[test]
 fn database_delete_document() {
-    utils::with_db(|db| {
-        let mut document = Document::new_with_id("foo");
-        db.save_document_with_concurency_control(&mut document, ConcurrencyControl::FailOnConflict)
-            .expect("save_document");
-        db.delete_document_with_concurency_control(&document, ConcurrencyControl::FailOnConflict)
+    utils::set_static(&DOCUMENT_DETECTED, false);
+
+    let config1 = utils::ReplicationTestConfiguration {
+        push_filter: Some(|document, is_deleted, _is_access_removed| { 
+            if is_deleted && document.id() == "foo" {
+                utils::set_static(&DOCUMENT_DETECTED, true);
+            }
+            true
+        }),
+        ..Default::default()
+    };
+    let config2: utils::ReplicationTestConfiguration = Default::default();
+
+    utils::with_three_dbs(config1, config2, |local_db1, local_db2, central_db, _repl1, _repl2| {
+        // Save doc 'foo'
+        utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+
+        // Check 'foo' is replicated to central and DB 2
+        assert!(utils::check_callback_with_wait(|| central_db.get_document("foo").is_ok(), None));
+        assert!(utils::check_callback_with_wait(|| local_db2.get_document("foo").is_ok(), None));
+
+        // Delete document in DB 1
+        let document = local_db1.get_document("foo").unwrap();
+        local_db1.delete_document_with_concurency_control(&document, ConcurrencyControl::FailOnConflict)
             .expect("delete_document");
-        let document = db.get_document("foo");
-        // TODO FIXME delete doesn't seem to work just like that (maybe need for replication)
-        assert!(document.is_err());
+
+        // Check document is replicated with deleted flag
+        assert!(utils::check_static_with_wait(&DOCUMENT_DETECTED, true, None));
     });
-}*/
+}
 
 #[test]
 fn database_purge_document() {
@@ -234,10 +257,6 @@ fn database_document_expiration() {
         assert!(expiration.is_some());
         assert_eq!(expiration.unwrap().0, 1000000000);
     });
-}
-
-lazy_static! {
-    static ref DOCUMENT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 }
 
 #[test]
