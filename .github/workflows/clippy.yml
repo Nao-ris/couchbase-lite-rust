@@ -1,0 +1,31 @@
+on: push
+name: Clippy check
+jobs:
+  clippy_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: mkdir -p .git/refs/heads && touch .git/refs/heads/master
+      - run: rustup component add clippy
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y --no-install-recommends libev-dev libevent-dev libpcsclite-dev
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --workspace --bins --lib -- -A clippy::all -D clippy::unwrap_used -D clippy::panic -D clippy::clone_on_copy -D warnings
+          name: Clippy default
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --workspace --bins --lib -- -A clippy::all -W clippy::complexity
+          name: Clippy default (complexity)
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --workspace --bins --lib --features=mock,unit-test,owner-mock,record_formater,recording,teletrans-saas,benchmark-data,tanker -- -A clippy::all -D clippy::unwrap_used -D clippy::panic -D clippy::clone_on_copy -D warnings
+          name: Clippy mock
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --workspace --bins --lib --features=mock,unit-test,owner-mock,record_formater,recording,teletrans-saas,benchmark-data,tanker -- -A clippy::all -W clippy::complexity
+          name: Clippy mock (complexity)
