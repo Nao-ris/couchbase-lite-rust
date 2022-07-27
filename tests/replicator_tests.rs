@@ -136,41 +136,6 @@ fn push_type_not_pulling() {
 
 /*
 #[test]
-fn continuous() {
-    let config1 = utils::ReplicationTestConfiguration {
-        continuous: false,
-        ..Default::default()
-    };
-    let config2: utils::ReplicationTestConfiguration = Default::default();
-
-    utils::with_three_dbs(
-        config1,
-        config2,
-        |local_db1, _local_db2, central_db, repl1, _repl2| {
-            // Save doc
-            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
-
-            // Check the replication process is not running automatically
-            assert!(!utils::check_callback_with_wait(
-                || central_db.get_document("foo").is_ok(),
-                None
-            ));
-
-            // Manually trigger the replication
-            repl1.start(false);
-
-            // Check the replication was successful
-            assert!(utils::check_callback_with_wait(
-                || central_db.get_document("foo").is_ok(),
-                None
-            ));
-        },
-    );
-}
-*/
-
-/*
-#[test]
 fn document_ids() {
     let mut array = MutableArray::new();
     array.append().put_string("foo");
@@ -427,4 +392,42 @@ fn encryption_decryption() {
             }
         },
     );
+}
+
+#[cfg(feature = "unsafe-threads-test")]
+mod unsafe_test {
+    use super::*;
+
+    #[test]
+    fn continuous() {
+        let config1 = utils::ReplicationTestConfiguration {
+            continuous: false,
+            ..Default::default()
+        };
+        let config2: utils::ReplicationTestConfiguration = Default::default();
+
+        utils::with_three_dbs(
+            config1,
+            config2,
+            |local_db1, _local_db2, central_db, repl1, _repl2| {
+                // Save doc
+                utils::add_doc(local_db1, "foo", 1234, "Hello World!");
+
+                // Check the replication process is not running automatically
+                assert!(!utils::check_callback_with_wait(
+                    || central_db.get_document("foo").is_ok(),
+                    None
+                ));
+
+                // Manually trigger the replication
+                repl1.start(false);
+
+                // Check the replication was successful
+                assert!(utils::check_callback_with_wait(
+                    || central_db.get_document("foo").is_ok(),
+                    None
+                ));
+            },
+        );
+    }
 }

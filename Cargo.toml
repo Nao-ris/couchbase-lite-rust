@@ -29,3 +29,4 @@ incremental = false
 
 [features]
 flaky-test = []
+unsafe-threads-test = []
