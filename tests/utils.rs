@@ -120,7 +120,7 @@ fn generate_replication_configuration(
         pinned_server_certificate: None,
         trusted_root_certificates: None,
         channels: MutableArray::default(),
-        document_ids: MutableArray::default(),
+        document_ids: config.document_ids,
         push_filter: config.push_filter,
         pull_filter: config.pull_filter,
         conflict_resolver: config.conflict_resolver,
