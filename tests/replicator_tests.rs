@@ -135,7 +135,7 @@ fn document_ids() {
     array.append().put_string("foo");
     array.append().put_string("foo3");
     let config1 = utils::ReplicationTestConfiguration {
-        document_ids: array,
+        document_ids: array.as_array(),
         ..Default::default()
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
