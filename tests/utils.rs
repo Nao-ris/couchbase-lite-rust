@@ -59,7 +59,7 @@ where
     if LEAK_CHECK.is_some() {
         warn!("Couchbase Lite objects were leaked by this test");
         dump_instances();
-        assert_ne!(
+        assert_eq!(
             instance_count() as usize,
             start_inst_count as usize,
             "Native object leak: {} objects, was {}",
