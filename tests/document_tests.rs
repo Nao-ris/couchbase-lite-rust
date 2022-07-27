@@ -4,10 +4,10 @@ extern crate lazy_static;
 
 use self::couchbase_lite::*;
 use lazy_static::lazy_static;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 pub mod utils;
-
-use std::sync::{Arc, Mutex};
 
 #[test]
 fn document_new() {
@@ -264,12 +264,12 @@ fn database_add_document_change_listener() {
 
 #[test]
 fn database_delete_document() {
-    utils::set_static(&DOCUMENT_DETECTED, false);
+    let (sender, receiver) = std::sync::mpsc::channel();
 
     let config1 = utils::ReplicationTestConfiguration {
-        push_filter: Some(Box::new(|document, is_deleted, _is_access_removed| {
+        push_filter: Some(Box::new(move |document, is_deleted, _is_access_removed| {
             if is_deleted && document.id() == "foo" {
-                utils::set_static(&DOCUMENT_DETECTED, true);
+                sender.send(true).unwrap();
             }
             true
         })),
@@ -304,11 +304,7 @@ fn database_delete_document() {
                 .expect("delete_document");
 
             // Check document is replicated with deleted flag
-            assert!(utils::check_static_with_wait(
-                &DOCUMENT_DETECTED,
-                true,
-                None
-            ));
+            receiver.recv_timeout(Duration::from_secs(1)).unwrap();
         },
     );
 }
