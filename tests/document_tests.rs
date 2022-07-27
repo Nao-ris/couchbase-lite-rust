@@ -267,12 +267,12 @@ fn database_delete_document() {
     utils::set_static(&DOCUMENT_DETECTED, false);
 
     let config1 = utils::ReplicationTestConfiguration {
-        push_filter: Some(|document, is_deleted, _is_access_removed| {
+        push_filter: Some(Box::new(|document, is_deleted, _is_access_removed| {
             if is_deleted && document.id() == "foo" {
                 utils::set_static(&DOCUMENT_DETECTED, true);
             }
             true
-        }),
+        })),
         ..Default::default()
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();

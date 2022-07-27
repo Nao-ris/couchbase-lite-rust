@@ -233,8 +233,8 @@ impl From<ProxySettings> for CBLProxySettings {
 }
 
 /** A callback that can decide whether a particular document should be pushed or pulled. */
-pub type ReplicationFilter =
-    fn(document: &Document, is_deleted: bool, is_access_removed: bool) -> bool;
+pub type ReplicationFilter = Box<dyn Fn(&Document, bool, bool) -> bool>;
+
 #[no_mangle]
 unsafe extern "C" fn c_replication_push_filter(
     context: *mut ::std::os::raw::c_void,
@@ -242,14 +242,15 @@ unsafe extern "C" fn c_replication_push_filter(
     flags: CBLDocumentFlags,
 ) -> bool {
     let repl_conf_context = context as *const ReplicationConfigurationContext;
-
     let document = Document::retain(document.cast::<CBLDocument>());
-
     let (is_deleted, is_access_removed) = read_document_flags(flags);
 
-    (*repl_conf_context).push_filter.map_or(false, |callback| {
-        callback(&document, is_deleted, is_access_removed)
-    })
+    (*repl_conf_context)
+        .push_filter
+        .as_ref()
+        .map_or(false, |callback| {
+            callback(&document, is_deleted, is_access_removed)
+        })
 }
 unsafe extern "C" fn c_replication_pull_filter(
     context: *mut ::std::os::raw::c_void,
@@ -257,14 +258,15 @@ unsafe extern "C" fn c_replication_pull_filter(
     flags: CBLDocumentFlags,
 ) -> bool {
     let repl_conf_context = context as *const ReplicationConfigurationContext;
-
     let document = Document::retain(document.cast::<CBLDocument>());
-
     let (is_deleted, is_access_removed) = read_document_flags(flags);
 
-    (*repl_conf_context).pull_filter.map_or(false, |callback| {
-        callback(&document, is_deleted, is_access_removed)
-    })
+    (*repl_conf_context)
+        .pull_filter
+        .as_ref()
+        .map_or(false, |callback| {
+            callback(&document, is_deleted, is_access_removed)
+        })
 }
 fn read_document_flags(flags: CBLDocumentFlags) -> (bool, bool) {
     (flags & DELETED != 0, flags & ACCESS_REMOVED != 0)
@@ -505,8 +507,14 @@ impl From<ReplicatorConfiguration>
                         .map_or(slice::NULL_SLICE, |c| slice::from_bytes(&c).get_ref()),
                     channels: config.channels.get_ref(),
                     documentIDs: config.document_ids.get_ref(),
-                    pushFilter: (*context).push_filter.and(Some(c_replication_push_filter)),
-                    pullFilter: (*context).pull_filter.and(Some(c_replication_pull_filter)),
+                    pushFilter: (*context)
+                        .push_filter
+                        .as_ref()
+                        .and(Some(c_replication_push_filter)),
+                    pullFilter: (*context)
+                        .pull_filter
+                        .as_ref()
+                        .and(Some(c_replication_pull_filter)),
                     conflictResolver: (*context)
                         .conflict_resolver
                         .and(Some(c_replication_conflict_resolver)),
