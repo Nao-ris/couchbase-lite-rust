@@ -18,8 +18,6 @@
 extern crate couchbase_lite;
 extern crate lazy_static;
 
-use self::couchbase_lite::*;
-
 pub mod utils;
 
 //////// TESTS:

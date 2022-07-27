@@ -27,14 +27,14 @@ use std::fmt;
 //////// ERROR STRUCT:
 
 /** Error type. Wraps multiple types of errors in an enum. */
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Error {
     pub code: ErrorCode,
     pub(crate) internal_info: Option<u32>,
 }
 
 /** The enum that stores the error domain and code for an Error. */
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum ErrorCode {
     CouchbaseLite(CouchbaseLiteError),
     POSIX(i32),
