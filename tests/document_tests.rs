@@ -77,7 +77,7 @@ fn document_properties() {
     let mut properties = MutableDict::new();
     properties.at("foo").put_bool(false);
     properties.at("bar").put_bool(true);
-    document.set_properties(properties);
+    document.set_properties(&properties);
     let mut properties = document.mutable_properties();
     properties.at("baz").put_bool(true);
     properties.at("foo").put_bool(true);
