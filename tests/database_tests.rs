@@ -72,11 +72,11 @@ fn add_listener() {
     utils::set_static(&DOCUMENT_DETECTED, false);
 
     utils::with_db(|db| {
-        let listener_token = db.add_listener(|_, doc_ids| {
+        let listener_token = db.add_listener(Box::new(|_, doc_ids| {
             if doc_ids.first().unwrap() == "document" {
                 utils::set_static(&DOCUMENT_DETECTED, true);
             }
-        });
+        }));
 
         let mut doc = Document::new_with_id("document");
         db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
