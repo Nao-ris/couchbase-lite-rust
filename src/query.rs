@@ -27,7 +27,6 @@ use crate::{
     },
 };
 
-use std::marker::PhantomData;
 use std::os::raw::c_uint;
 
 /** Query languages. */
@@ -92,7 +91,6 @@ impl Query {
         unsafe {
             Dict {
                 cbl_ref: CBLQuery_Parameters(self.get_ref()),
-                owner: PhantomData,
             }
         }
     }
@@ -204,21 +202,19 @@ pub struct Row<'r> {
 
 impl<'r> Row<'r> {
     /** Returns the value of a column, given its (zero-based) index. */
-    pub fn get(&self, index: isize) -> Value<'r> {
+    pub fn get(&self, index: isize) -> Value {
         unsafe {
             Value {
                 cbl_ref: CBLResultSet_ValueAtIndex(self.results.get_ref(), index as c_uint),
-                owner: PhantomData,
             }
         }
     }
 
     /** Returns the value of a column, given its name. */
-    pub fn get_key(&self, key: &str) -> Value<'r> {
+    pub fn get_key(&self, key: &str) -> Value {
         unsafe {
             Value {
                 cbl_ref: CBLResultSet_ValueForKey(self.results.get_ref(), from_str(key).get_ref()),
-                owner: PhantomData,
             }
         }
     }
@@ -244,7 +240,6 @@ impl<'r> Row<'r> {
         unsafe {
             Array {
                 cbl_ref: CBLResultSet_ResultArray(self.results.get_ref()),
-                owner: PhantomData,
             }
         }
     }
@@ -254,7 +249,6 @@ impl<'r> Row<'r> {
         unsafe {
             Dict {
                 cbl_ref: CBLResultSet_ResultDict(self.results.get_ref()),
-                owner: PhantomData,
             }
         }
     }

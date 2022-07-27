@@ -38,7 +38,6 @@ use crate::{
 use enum_primitive::FromPrimitive;
 use std::collections::HashSet;
 use std::fmt;
-use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ptr;
 use std::str;
@@ -97,7 +96,7 @@ impl Fleece {
         self.root().as_dict()
     }
 
-    pub fn data<'a>(&self) -> &'a [u8] {
+    pub fn data(&self) -> &[u8] {
         unsafe { FLDoc_GetData(self.get_ref()).as_byte_array().unwrap() }
     }
 }
@@ -145,7 +144,6 @@ pub trait FleeceReference:
     fn as_value(&self) -> Value {
         Value {
             cbl_ref: self._fleece_ref(),
-            owner: PhantomData,
         }
     }
 
@@ -166,29 +164,24 @@ pub trait FleeceReference:
 
 /** A Fleece value. It could be any type, including Undefined (empty). */
 #[derive(Clone, Copy)]
-pub struct Value<'a> {
+pub struct Value {
     pub(crate) cbl_ref: FLValue,
-    pub(crate) owner: PhantomData<&'a Fleece>,
 }
 
-impl<'a> CblRef for Value<'a> {
+impl CblRef for Value {
     type Output = FLValue;
     fn get_ref(&self) -> Self::Output {
         self.cbl_ref
     }
 }
 
-impl<'a> Value<'a> {
-    pub const UNDEFINED: Value<'static> = Value {
+impl Value {
+    pub const UNDEFINED: Value = Value {
         cbl_ref: ptr::null(),
-        owner: PhantomData,
     };
 
     pub(crate) const fn wrap<T>(value: FLValue, _owner: &T) -> Self {
-        Self {
-            cbl_ref: value,
-            owner: PhantomData,
-        }
+        Self { cbl_ref: value }
     }
 
     pub fn get_type(&self) -> ValueType {
@@ -271,28 +264,26 @@ impl<'a> Value<'a> {
         }
     }
 
-    pub fn as_string(&self) -> Option<&'a str> {
+    pub fn as_string(&self) -> Option<&str> {
         unsafe { FLValue_AsString(self.get_ref()).as_str() }
     }
 
-    pub fn as_data(&self) -> Option<&'a [u8]> {
+    pub fn as_data(&self) -> Option<&[u8]> {
         unsafe { FLValue_AsData(self.get_ref()).as_byte_array() }
     }
 
-    pub fn as_array(&self) -> Array<'a> {
+    pub fn as_array(&self) -> Array {
         unsafe {
             Array {
                 cbl_ref: FLValue_AsArray(self.get_ref()),
-                owner: self.owner,
             }
         }
     }
 
-    pub fn as_dict(&self) -> Dict<'a> {
+    pub fn as_dict(&self) -> Dict {
         unsafe {
             Dict {
                 cbl_ref: FLValue_AsDict(self.get_ref()),
-                owner: self.owner,
             }
         }
     }
@@ -305,34 +296,34 @@ impl<'a> Value<'a> {
     }
 }
 
-impl<'a> FleeceReference for Value<'a> {
+impl FleeceReference for Value {
     fn _fleece_ref(&self) -> FLValue {
         self.get_ref()
     }
 }
 
-impl<'a> Default for Value<'a> {
+impl Default for Value {
     fn default() -> Self {
         Self::UNDEFINED
     }
 }
 
-impl<'a> PartialEq for Value<'a> {
+impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         unsafe { FLValue_IsEqual(self.get_ref(), other.get_ref()) }
     }
 }
 
-impl<'a> Eq for Value<'a> {}
+impl Eq for Value {}
 
-impl<'a> std::ops::Not for Value<'a> {
+impl std::ops::Not for Value {
     type Output = bool;
     fn not(self) -> bool {
         self.get_ref().is_null()
     }
 }
 
-impl<'a> fmt::Debug for Value<'a> {
+impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Value")
             .field("type", &self.get_type())
@@ -340,7 +331,7 @@ impl<'a> fmt::Debug for Value<'a> {
     }
 }
 
-impl<'a> fmt::Display for Value<'a> {
+impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_json())
     }
@@ -350,24 +341,20 @@ impl<'a> fmt::Display for Value<'a> {
 
 /** A Fleece array value. */
 #[derive(Clone, Copy)]
-pub struct Array<'a> {
+pub struct Array {
     pub(crate) cbl_ref: FLArray,
-    pub(crate) owner: PhantomData<&'a Fleece>,
 }
 
-impl<'a> CblRef for Array<'a> {
+impl CblRef for Array {
     type Output = FLArray;
     fn get_ref(&self) -> Self::Output {
         self.cbl_ref
     }
 }
 
-impl<'a> Array<'a> {
-    pub(crate) const fn wrap<T>(array: FLArray, _owner: &T) -> Self {
-        Self {
-            cbl_ref: array,
-            owner: PhantomData,
-        }
+impl Array {
+    pub(crate) const fn wrap(array: FLArray) -> Self {
+        Self { cbl_ref: array }
     }
 
     pub fn count(&self) -> u32 {
@@ -377,59 +364,56 @@ impl<'a> Array<'a> {
         unsafe { FLArray_IsEmpty(self.get_ref()) }
     }
 
-    pub fn get(&self, index: u32) -> Value<'a> {
+    pub fn get(&self, index: u32) -> Value {
         unsafe {
             Value {
                 cbl_ref: FLArray_Get(self.get_ref(), index),
-                owner: self.owner,
             }
         }
     }
 
-    pub fn iter(&self) -> ArrayIterator<'a> {
+    pub fn iter(&self) -> ArrayIterator {
         unsafe {
             let mut i = MaybeUninit::<FLArrayIterator>::uninit();
             FLArrayIterator_Begin(self.get_ref(), i.as_mut_ptr());
             ArrayIterator {
                 innards: i.assume_init(),
-                owner: self.owner,
                 len: self.count() as usize,
             }
         }
     }
 }
 
-impl<'a> FleeceReference for Array<'a> {
+impl FleeceReference for Array {
     fn _fleece_ref(&self) -> FLValue {
         self.get_ref().cast::<_FLValue>()
     }
 }
 
-impl<'a> Default for Array<'a> {
+impl Default for Array {
     fn default() -> Self {
         Self {
             cbl_ref: ptr::null(),
-            owner: PhantomData,
         }
     }
 }
 
-impl<'a> PartialEq for Array<'a> {
+impl PartialEq for Array {
     fn eq(&self, other: &Self) -> bool {
         self.as_value() == other.as_value()
     }
 }
 
-impl<'a> Eq for Array<'a> {}
+impl Eq for Array {}
 
-impl<'a> std::ops::Not for Array<'a> {
+impl std::ops::Not for Array {
     type Output = bool;
     fn not(self) -> bool {
         self.get_ref().is_null()
     }
 }
 
-impl<'a> fmt::Debug for Array<'a> {
+impl fmt::Debug for Array {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Array")
             .field("count", &self.count())
@@ -437,15 +421,15 @@ impl<'a> fmt::Debug for Array<'a> {
     }
 }
 
-impl<'a> fmt::Display for Array<'a> {
+impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.as_value().to_json())
     }
 }
 
-impl<'a> IntoIterator for Array<'a> {
-    type Item = Value<'a>;
-    type IntoIter = ArrayIterator<'a>;
+impl IntoIterator for Array {
+    type Item = Value;
+    type IntoIter = ArrayIterator;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -459,13 +443,12 @@ impl<'a> IntoIterator for Array<'a> {
 
 //////// ARRAY ITERATOR
 
-pub struct ArrayIterator<'a> {
+pub struct ArrayIterator {
     innards: FLArrayIterator,
-    owner: PhantomData<&'a Fleece>,
     len: usize,
 }
 
-impl<'a> ArrayIterator<'a> {
+impl ArrayIterator {
     pub fn count(&self) -> u32 {
         unsafe { FLArrayIterator_GetCount(&self.innards) }
     }
@@ -480,8 +463,8 @@ impl<'a> ArrayIterator<'a> {
     }
 }
 
-impl<'a> Iterator for ArrayIterator<'a> {
-    type Item = Value<'a>;
+impl Iterator for ArrayIterator {
+    type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
@@ -490,24 +473,21 @@ impl<'a> Iterator for ArrayIterator<'a> {
                 return None;
             }
             FLArrayIterator_Next(&mut self.innards);
-            Some(Value {
-                cbl_ref: val,
-                owner: PhantomData,
-            })
+            Some(Value { cbl_ref: val })
         }
     }
 }
 
-impl<'a> std::iter::FusedIterator for ArrayIterator<'a> {}
+impl std::iter::FusedIterator for ArrayIterator {}
 
-impl<'a> ExactSizeIterator for ArrayIterator<'a> {
+impl ExactSizeIterator for ArrayIterator {
     fn len(&self) -> usize {
         self.len
     }
 }
 
-impl<'a> std::iter::FromIterator<Value<'a>> for MutableArray {
-    fn from_iter<I: IntoIterator<Item = Value<'a>>>(iter: I) -> Self {
+impl std::iter::FromIterator<Value> for MutableArray {
+    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
         let mut c = Self::new();
         for v in iter {
             c.append().put_value(&v);
@@ -520,37 +500,29 @@ impl<'a> std::iter::FromIterator<Value<'a>> for MutableArray {
 
 /** A Fleece dictionary (object) value. */
 #[derive(Clone, Copy)]
-pub struct Dict<'a> {
+pub struct Dict {
     pub(crate) cbl_ref: FLDict,
-    pub(crate) owner: PhantomData<&'a Fleece>,
 }
 
-impl<'a> CblRef for Dict<'a> {
+impl CblRef for Dict {
     type Output = FLDict;
     fn get_ref(&self) -> Self::Output {
         self.cbl_ref
     }
 }
 
-impl<'a> Dict<'a> {
+impl Dict {
     pub(crate) const fn new(dict: FLDict) -> Self {
-        Self {
-            cbl_ref: dict,
-            owner: PhantomData,
-        }
+        Self { cbl_ref: dict }
     }
 
     pub(crate) const fn wrap<T>(dict: FLDict, _owner: &T) -> Self {
-        Self {
-            cbl_ref: dict,
-            owner: PhantomData,
-        }
+        Self { cbl_ref: dict }
     }
 
-    pub fn as_value(&self) -> Value<'a> {
+    pub fn as_value(&self) -> Value {
         Value {
             cbl_ref: self.get_ref().cast::<_FLValue>(),
-            owner: self.owner,
         }
     }
 
@@ -565,20 +537,18 @@ impl<'a> Dict<'a> {
         unsafe { FLDict_IsEncryptableValue(self.get_ref()) }
     }
 
-    pub fn get(&self, key: &str) -> Value<'a> {
+    pub fn get(&self, key: &str) -> Value {
         unsafe {
             Value {
                 cbl_ref: FLDict_Get(self.get_ref(), from_str(key).get_ref()),
-                owner: self.owner,
             }
         }
     }
 
-    pub fn get_key(&self, key: &mut DictKey) -> Value<'a> {
+    pub fn get_key(&self, key: &mut DictKey) -> Value {
         unsafe {
             Value {
                 cbl_ref: FLDict_GetWithKey(self.get_ref(), &mut key.innards),
-                owner: self.owner,
             }
         }
     }
@@ -590,13 +560,12 @@ impl<'a> Dict<'a> {
         }
     }
 
-    pub fn iter(&self) -> DictIterator<'a> {
+    pub fn iter(&self) -> DictIterator {
         unsafe {
             let mut i = MaybeUninit::<FLDictIterator>::uninit();
             FLDictIterator_Begin(self.get_ref(), i.as_mut_ptr());
             DictIterator {
                 innards: i.assume_init(),
-                owner: self.owner,
                 len: self.count() as usize,
             }
         }
@@ -609,37 +578,36 @@ impl<'a> Dict<'a> {
     }
 }
 
-impl<'a> FleeceReference for Dict<'a> {
+impl FleeceReference for Dict {
     fn _fleece_ref(&self) -> FLValue {
         self.get_ref().cast::<_FLValue>()
     }
 }
 
-impl<'a> Default for Dict<'a> {
+impl Default for Dict {
     fn default() -> Self {
         Self {
             cbl_ref: ptr::null(),
-            owner: PhantomData,
         }
     }
 }
 
-impl<'a> PartialEq for Dict<'a> {
+impl PartialEq for Dict {
     fn eq(&self, other: &Self) -> bool {
         self.as_value() == other.as_value()
     }
 }
 
-impl<'a> Eq for Dict<'a> {}
+impl Eq for Dict {}
 
-impl<'a> std::ops::Not for Dict<'a> {
+impl std::ops::Not for Dict {
     type Output = bool;
     fn not(self) -> bool {
         self.get_ref().is_null()
     }
 }
 
-impl<'a> fmt::Debug for Dict<'a> {
+impl fmt::Debug for Dict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Dict")
             .field("count", &self.count())
@@ -647,15 +615,15 @@ impl<'a> fmt::Debug for Dict<'a> {
     }
 }
 
-impl<'a> fmt::Display for Dict<'a> {
+impl fmt::Display for Dict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.as_value().to_json())
     }
 }
 
-impl<'a> IntoIterator for Dict<'a> {
-    type Item = (&'a str, Value<'a>);
-    type IntoIter = DictIterator<'a>;
+impl IntoIterator for Dict {
+    type Item = (String, Value);
+    type IntoIter = DictIterator;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -683,20 +651,19 @@ impl DictKey {
 
 //////// DICT ITERATOR
 
-pub struct DictIterator<'a> {
+pub struct DictIterator {
     innards: FLDictIterator,
-    owner: PhantomData<&'a Fleece>,
     len: usize,
 }
 
-impl<'a> DictIterator<'a> {
+impl DictIterator {
     pub fn count(&self) -> u32 {
         unsafe { FLDictIterator_GetCount(&self.innards) }
     }
 }
 
-impl<'a> Iterator for DictIterator<'a> {
-    type Item = (&'a str, Value<'a>);
+impl Iterator for DictIterator {
+    type Item = (String, Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
@@ -706,30 +673,24 @@ impl<'a> Iterator for DictIterator<'a> {
             }
             let key = FLDictIterator_GetKeyString(&self.innards).as_str().unwrap();
             FLDictIterator_Next(&mut self.innards);
-            Some((
-                key,
-                Value {
-                    cbl_ref: val,
-                    owner: PhantomData,
-                },
-            ))
+            Some((key.to_string(), Value { cbl_ref: val }))
         }
     }
 }
 
-impl<'a> std::iter::FusedIterator for DictIterator<'a> {}
+impl std::iter::FusedIterator for DictIterator {}
 
-impl<'a> ExactSizeIterator for DictIterator<'a> {
+impl ExactSizeIterator for DictIterator {
     fn len(&self) -> usize {
         self.len
     }
 }
 
-impl<'a> std::iter::FromIterator<(&'a str, Value<'a>)> for MutableDict {
-    fn from_iter<T: IntoIterator<Item = (&'a str, Value<'a>)>>(iter: T) -> Self {
+impl std::iter::FromIterator<(String, Value)> for MutableDict {
+    fn from_iter<T: IntoIterator<Item = (String, Value)>>(iter: T) -> Self {
         let mut mut_dict = Self::new();
         for (key, value) in iter {
-            mut_dict.at(key).put_value(&value);
+            mut_dict.at(&key).put_value(&value);
         }
         mut_dict
     }
