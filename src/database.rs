@@ -15,12 +15,23 @@
 // limitations under the License.
 //
 
-use super::c_api::*;
-use super::error::*;
-use super::slice::*;
-use super::*;
+use crate::{
+    CblRef, ListenerToken, release, retain,
+    slice::from_str,
+    error::{Result, check_bool, failure},
+    c_api::{
+        CBLDatabase, CBLDatabaseConfiguration, CBLDatabaseConfiguration_Default,
+        CBLDatabase_AddChangeListener, CBLDatabase_BeginTransaction,
+        CBLDatabase_BufferNotifications, CBLDatabase_Count, CBLDatabase_Delete,
+        CBLDatabase_EndTransaction, CBLDatabase_Name, CBLDatabase_Open, CBLDatabase_Path,
+        CBLDatabase_PerformMaintenance, CBLDatabase_SendNotifications, CBLEncryptionKey, CBLError,
+        CBL_DatabaseExists, CBL_DeleteDatabase, FLString, kCBLMaintenanceTypeCompact,
+        kCBLMaintenanceTypeFullOptimize, kCBLMaintenanceTypeIntegrityCheck,
+        kCBLMaintenanceTypeOptimize, kCBLMaintenanceTypeReindex,
+    },
+};
 
-use std::path::*;
+use std::path::{Path, PathBuf};
 use std::ptr;
 
 /** Database configuration options. */
@@ -70,7 +81,7 @@ unsafe extern "C" fn c_database_buffer_notifications(
 ) {
     let callback: BufferNotifications = std::mem::transmute(context);
 
-    let database = Database::retain(db as *mut CBLDatabase);
+    let database = Database::retain(db.cast::<CBLDatabase>());
 
     callback(&database);
 }
@@ -78,22 +89,26 @@ unsafe extern "C" fn c_database_buffer_notifications(
 /** A connection to an open database. */
 #[derive(Debug, PartialEq, Eq)]
 pub struct Database {
-    _ref: *mut CBLDatabase,
+    cbl_ref: *mut CBLDatabase,
+}
+
+impl CblRef for Database {
+    type Output = *mut CBLDatabase;
+    fn get_ref(&self) -> Self::Output {
+        self.cbl_ref
+    }
 }
 
 impl Database {
     //////// CONSTRUCTORS:
-
-    pub(crate) fn retain(_ref: *mut CBLDatabase) -> Database {
-        Database {
-            _ref: unsafe { retain(_ref) },
+    pub(crate) fn retain(cbl_ref: *mut CBLDatabase) -> Self {
+        Self {
+            cbl_ref: unsafe { retain(cbl_ref) },
         }
     }
-    pub(crate) fn wrap(_ref: *mut CBLDatabase) -> Database {
-        Database { _ref }
-    }
-    pub(crate) fn get_ref(&self) -> *mut CBLDatabase {
-        self._ref
+
+    pub(crate) const fn wrap(cbl_ref: *mut CBLDatabase) -> Self {
+        Self { cbl_ref }
     }
 
     /** Opens a database, or creates it if it doesn't exist yet, returning a new `Database`
@@ -101,28 +116,27 @@ impl Database {
 
     It's OK to open the same database file multiple times. Each `Database` instance is
     independent of the others (and must be separately closed and released.) */
-    pub fn open(name: &str, config: Option<DatabaseConfiguration>) -> Result<Database> {
+    pub fn open(name: &str, config: Option<DatabaseConfiguration>) -> Result<Self> {
         unsafe {
             if let Some(cfg) = config {
                 let mut c_config: CBLDatabaseConfiguration = CBLDatabaseConfiguration_Default();
-                c_config.directory = as_slice(cfg.directory.to_str().unwrap())._ref;
+                c_config.directory = from_str(cfg.directory.to_str().unwrap()).get_ref();
                 if let Some(encryption_key) = cfg.encryption_key.as_ref() {
                     c_config.encryptionKey = *encryption_key;
                 }
-                Database::_open(name, &c_config)
-            } else {
-                Database::_open(name, ptr::null())
+                return Self::_open(name, &c_config);
             }
+            Self::_open(name, ptr::null())
         }
     }
 
-    unsafe fn _open(name: &str, config_ptr: *const CBLDatabaseConfiguration) -> Result<Database> {
+    unsafe fn _open(name: &str, config_ptr: *const CBLDatabaseConfiguration) -> Result<Self> {
         let mut err = CBLError::default();
-        let db_ref = CBLDatabase_Open(as_slice(name)._ref, config_ptr, &mut err);
+        let db_ref = CBLDatabase_Open(from_str(name).get_ref(), config_ptr, &mut err);
         if db_ref.is_null() {
             return failure(err);
         }
-        Ok(Database::wrap(db_ref))
+        Ok(Self::wrap(db_ref))
     }
 
     //////// OTHER STATIC METHODS:
@@ -130,10 +144,10 @@ impl Database {
     /** Returns true if a database with the given name exists in the given directory. */
     pub fn exists<P: AsRef<Path>>(name: &str, in_directory: P) -> bool {
         unsafe {
-            return CBL_DatabaseExists(
-                as_slice(name)._ref,
-                as_slice(in_directory.as_ref().to_str().unwrap())._ref,
-            );
+            CBL_DatabaseExists(
+                from_str(name).get_ref(),
+                from_str(in_directory.as_ref().to_str().unwrap()).get_ref(),
+            )
         }
     }
 
@@ -142,8 +156,8 @@ impl Database {
         unsafe {
             let mut error = CBLError::default();
             if CBL_DeleteDatabase(
-                as_slice(name)._ref,
-                as_slice(in_directory.as_ref().to_str().unwrap())._ref,
+                from_str(name).get_ref(),
+                from_str(in_directory.as_ref().to_str().unwrap()).get_ref(),
                 &mut error,
             ) {
                 Ok(true)
@@ -160,13 +174,15 @@ impl Database {
     /** Closes and deletes a database. If there are any other connections to the database,
     an error is returned. */
     pub fn delete(self) -> Result<()> {
-        unsafe { check_bool(|error| CBLDatabase_Delete(self._ref, error)) }
+        unsafe { check_bool(|error| CBLDatabase_Delete(self.get_ref(), error)) }
     }
 
     /** Compacts a database file, freeing up unused disk space. */
     pub fn perform_maintenance(&mut self, of_type: MaintenanceType) -> Result<()> {
         unsafe {
-            check_bool(|error| CBLDatabase_PerformMaintenance(self._ref, of_type as u32, error))
+            check_bool(|error| {
+                CBLDatabase_PerformMaintenance(self.get_ref(), of_type as u32, error)
+            })
         }
     }
 
@@ -175,16 +191,19 @@ impl Database {
     - Changes will not be visible to other Database instances on the same database until
            the transaction ends.
     - Transactions can nest. Changes are not committed until the outer one ends. */
-    pub fn in_transaction<T>(&mut self, callback: fn(&mut Database) -> Result<T>) -> Result<T> {
+    pub fn in_transaction<T, F>(&mut self, callback: F) -> Result<T>
+    where
+        F: Fn(&mut Self) -> Result<T>,
+    {
         let mut err = CBLError::default();
         unsafe {
-            if !CBLDatabase_BeginTransaction(self._ref, &mut err) {
+            if !CBLDatabase_BeginTransaction(self.get_ref(), &mut err) {
                 return failure(err);
             }
         }
         let result = callback(self);
         unsafe {
-            if !CBLDatabase_EndTransaction(self._ref, result.is_ok(), &mut err) {
+            if !CBLDatabase_EndTransaction(self.get_ref(), result.is_ok(), &mut err) {
                 return failure(err);
             }
         }
@@ -195,19 +214,17 @@ impl Database {
 
     /** Returns the database's name. */
     pub fn name(&self) -> &str {
-        unsafe {
-            return CBLDatabase_Name(self._ref).as_str().unwrap();
-        }
+        unsafe { CBLDatabase_Name(self.get_ref()).as_str().unwrap() }
     }
 
     /** Returns the database's full filesystem path. */
     pub fn path(&self) -> PathBuf {
-        unsafe { PathBuf::from(CBLDatabase_Path(self._ref).to_string().unwrap()) }
+        unsafe { PathBuf::from(CBLDatabase_Path(self.get_ref()).to_string().unwrap()) }
     }
 
     /** Returns the number of documents in the database. */
     pub fn count(&self) -> u64 {
-        unsafe { CBLDatabase_Count(self._ref) }
+        unsafe { CBLDatabase_Count(self.get_ref()) }
     }
 
     //////// NOTIFICATIONS:
@@ -220,8 +237,8 @@ impl Database {
             let callback: Box<ChangeListener> = Box::new(Box::new(listener));
 
             ListenerToken {
-                _ref: CBLDatabase_AddChangeListener(
-                    self._ref,
+                cbl_ref: CBLDatabase_AddChangeListener(
+                    self.cbl_ref,
                     Some(c_database_change_listener),
                     Box::into_raw(callback) as *mut _,
                 ),
@@ -235,10 +252,10 @@ impl Database {
     `send_notifications` when you're ready. */
     pub fn buffer_notifications(&self, callback: BufferNotifications) {
         unsafe {
-            let callback: *mut ::std::os::raw::c_void = callback as *mut std::ffi::c_void;
+            let callback = callback as *mut std::ffi::c_void;
 
             CBLDatabase_BufferNotifications(
-                self._ref,
+                self.get_ref(),
                 Some(c_database_buffer_notifications),
                 callback,
             );
@@ -249,19 +266,19 @@ impl Database {
     callbacks. (Only useful after `buffer_notifications` has been called.) */
     pub fn send_notifications(&self) {
         unsafe {
-            CBLDatabase_SendNotifications(self._ref);
+            CBLDatabase_SendNotifications(self.get_ref());
         }
     }
 }
 
 impl Drop for Database {
     fn drop(&mut self) {
-        unsafe { release(self._ref) }
+        unsafe { release(self.get_ref()) }
     }
 }
 
 impl Clone for Database {
     fn clone(&self) -> Self {
-        Database::retain(self._ref)
+        Self::retain(self.get_ref())
     }
 }

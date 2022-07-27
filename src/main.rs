@@ -18,7 +18,7 @@
 extern crate couchbase_lite;
 extern crate tempdir;
 
-use couchbase_lite::*;
+use couchbase_lite::{ConcurrencyControl, Database, DatabaseConfiguration, Document, FleeceReference};
 use tempdir::TempDir;
 
 use std::ptr;

@@ -7,6 +7,11 @@ enum_primitive = "*"
 tempdir = "*"
 lazy_static = "1.4.0"
 
+[dev-dependencies.cargo-husky]
+version = "1"
+default-features = false # Disable features which are enabled by default
+features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt"]
+
 [build-dependencies]
 bindgen = "0.53.1"
 

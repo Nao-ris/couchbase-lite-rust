@@ -15,15 +15,18 @@
 // limitations under the License.
 //
 
-use super::c_api::*;
+use crate::c_api::{
+    CBLLogDomain, CBLLogLevel, CBLLog_SetCallback, CBLLog_SetCallbackLevel, CBLLog_SetConsoleLevel,
+    CBL_Log, FLString,
+};
 
 use enum_primitive::FromPrimitive;
-use std::ffi::CString;
 use std::fmt;
+use std::ffi::CString;
 
 enum_from_primitive! {
     /** Logging domains: subsystems that generate log messages. */
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum Domain {
         Database,
         Query,
@@ -35,7 +38,7 @@ enum_from_primitive! {
 enum_from_primitive! {
     /** Levels of log messages. Higher values are more important/severe.
         Each level includes the lower ones. */
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum Level {
         Debug,
         Verbose,

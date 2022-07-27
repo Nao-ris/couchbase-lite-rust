@@ -65,7 +65,7 @@ fn main() {
         .header("src/wrapper.h")
         //.header("libcblite-3.0.1/include/cbl/CouchbaseLite.h")
         // C '#include' search paths:
-        .clang_arg("-I".to_owned() + CBL_INCLUDE_DIR)
+        .clang_arg(format!("-I{}", CBL_INCLUDE_DIR))
         // Which symbols to generate bindings for:
         .whitelist_type("CBL.*")
         .whitelist_type("FL.*")
@@ -73,6 +73,7 @@ fn main() {
         .whitelist_var("k?FL.*")
         .whitelist_function("CBL.*")
         .whitelist_function("_?FL.*")
+        .no_copy("FLSliceResult")
         .clang_arg(format!("-isysroot{}", sdk_root))
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.

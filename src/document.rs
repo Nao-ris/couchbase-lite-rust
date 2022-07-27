@@ -15,14 +15,35 @@
 // limitations under the License.
 //
 
-use super::c_api::*;
-use super::slice::*;
-use super::*;
+use crate::{
+    c_api::{
+        CBLDatabase, CBLDatabase_AddDocumentChangeListener, CBLDatabase_DeleteDocument,
+        CBLDatabase_DeleteDocumentWithConcurrencyControl, CBLDatabase_GetDocumentExpiration,
+        CBLDatabase_GetMutableDocument, CBLDatabase_PurgeDocument, CBLDatabase_PurgeDocumentByID,
+        CBLDatabase_SaveDocument, CBLDatabase_SaveDocumentWithConcurrencyControl,
+        CBLDatabase_SaveDocumentWithConflictHandler, CBLDatabase_SetDocumentExpiration,
+        CBLDocument, CBLDocument_Create, CBLDocument_CreateJSON, CBLDocument_CreateWithID,
+        CBLDocument_ID, CBLDocument_MutableProperties, CBLDocument_Properties,
+        CBLDocument_RevisionID, CBLDocument_Sequence, CBLDocument_SetJSON,
+        CBLDocument_SetProperties, CBLError, FLString, kCBLConcurrencyControlFailOnConflict,
+        kCBLConcurrencyControlLastWriteWins,
+    },
+    slice::from_str,
+    CblRef, CouchbaseLiteError, Database, Dict, Error, ListenerToken, MutableDict, Result,
+    Timestamp, check_bool, check_failure, failure, release, retain,
+};
 
 /** An in-memory copy of a document. */
 #[derive(Debug)]
 pub struct Document {
-    _ref: *mut CBLDocument,
+    cbl_ref: *mut CBLDocument,
+}
+
+impl CblRef for Document {
+    type Output = *mut CBLDocument;
+    fn get_ref(&self) -> Self::Output {
+        self.cbl_ref
+    }
 }
 
 /** Conflict-handling options when saving or deleting a document. */
@@ -76,13 +97,14 @@ impl Database {
             // we always get a mutable CBLDocument,
             // since Rust doesn't let us have MutableDocument subclass.
             let mut error = CBLError::default();
-            let doc = CBLDatabase_GetMutableDocument(self.get_ref(), as_slice(id)._ref, &mut error);
+            let doc =
+                CBLDatabase_GetMutableDocument(self.get_ref(), from_str(id).get_ref(), &mut error);
             if doc.is_null() {
-                if error.code != 0 {
-                    return failure(error);
+                return if error.code == 0 {
+                    Err(Error::cbl_error(CouchbaseLiteError::NotFound))
                 } else {
-                    return Err(Error::cbl_error(CouchbaseLiteError::NotFound));
-                }
+                    failure(error)
+                };
             }
             Ok(Document::wrap(doc))
         }
@@ -94,7 +116,9 @@ impl Database {
     `save_document_with_concurency_control` or
     `save_document_resolving` instead. */
     pub fn save_document(&mut self, doc: &mut Document) -> Result<()> {
-        unsafe { check_bool(|error| CBLDatabase_SaveDocument(self.get_ref(), doc._ref, error)) }
+        unsafe {
+            check_bool(|error| CBLDatabase_SaveDocument(self.get_ref(), doc.get_ref(), error))
+        }
     }
 
     /** Saves a new or modified document to the database.
@@ -112,7 +136,7 @@ impl Database {
             check_bool(|error| {
                 CBLDatabase_SaveDocumentWithConcurrencyControl(
                     self.get_ref(),
-                    doc._ref,
+                    doc.get_ref(),
                     c_concurrency,
                     error,
                 )
@@ -129,17 +153,17 @@ impl Database {
         conflict_handler: ConflictHandler,
     ) -> Result<Document> {
         unsafe {
-            let callback: *mut ::std::os::raw::c_void = conflict_handler as *mut std::ffi::c_void;
+            let callback = conflict_handler as *mut std::ffi::c_void;
             match check_bool(|error| {
                 CBLDatabase_SaveDocumentWithConflictHandler(
                     self.get_ref(),
-                    doc._ref,
+                    doc.get_ref(),
                     Some(c_conflict_handler),
                     callback,
                     error,
                 )
             }) {
-                Ok(_) => Ok(doc.to_owned()),
+                Ok(_) => Ok(doc.clone()),
                 Err(err) => Err(err),
             }
         }
@@ -147,7 +171,9 @@ impl Database {
 
     /** Deletes a document from the database. Deletions are replicated. */
     pub fn delete_document(&mut self, doc: &Document) -> Result<()> {
-        unsafe { check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc._ref, error)) }
+        unsafe {
+            check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc.get_ref(), error))
+        }
     }
 
     /** Deletes a document from the database. Deletions are replicated. */
@@ -161,7 +187,7 @@ impl Database {
             check_bool(|error| {
                 CBLDatabase_DeleteDocumentWithConcurrencyControl(
                     self.get_ref(),
-                    doc._ref,
+                    doc.get_ref(),
                     c_concurrency,
                     error,
                 )
@@ -172,14 +198,16 @@ impl Database {
     /** Purges a document. This removes all traces of the document from the database.
     Purges are _not_ replicated. If the document is changed on a server, it will be re-created */
     pub fn purge_document(&mut self, doc: &Document) -> Result<()> {
-        unsafe { check_bool(|error| CBLDatabase_PurgeDocument(self.get_ref(), doc._ref, error)) }
+        unsafe {
+            check_bool(|error| CBLDatabase_PurgeDocument(self.get_ref(), doc.get_ref(), error))
+        }
     }
 
     /** Purges a document, given only its ID. */
     pub fn purge_document_by_id(&mut self, id: &str) -> Result<()> {
         unsafe {
             check_bool(|error| {
-                CBLDatabase_PurgeDocumentByID(self.get_ref(), as_slice(id)._ref, error)
+                CBLDatabase_PurgeDocumentByID(self.get_ref(), from_str(id).get_ref(), error)
             })
         }
     }
@@ -192,15 +220,13 @@ impl Database {
             let mut error = CBLError::default();
             let exp = CBLDatabase_GetDocumentExpiration(
                 self.get_ref(),
-                as_slice(doc_id)._ref,
+                from_str(doc_id).get_ref(),
                 &mut error,
             );
-            if exp < 0 {
-                failure(error)
-            } else if exp == 0 {
-                Ok(None)
-            } else {
-                Ok(Some(Timestamp(exp)))
+            match exp {
+                0 => Ok(None),
+                _ if exp > 0 => Ok(Some(Timestamp(exp))),
+                _ => failure(error),
             }
         }
     }
@@ -213,7 +239,12 @@ impl Database {
         };
         unsafe {
             check_bool(|error| {
-                CBLDatabase_SetDocumentExpiration(self.get_ref(), as_slice(doc_id)._ref, exp, error)
+                CBLDatabase_SetDocumentExpiration(
+                    self.get_ref(),
+                    from_str(doc_id).get_ref(),
+                    exp,
+                    error,
+                )
             })
         }
     }
@@ -226,61 +257,64 @@ impl Database {
         listener: ChangeListener,
     ) -> ListenerToken {
         unsafe {
-            let callback: *mut ::std::os::raw::c_void = listener as *mut std::ffi::c_void;
-
-            ListenerToken {
-                _ref: CBLDatabase_AddDocumentChangeListener(
-                    self.get_ref(),
-                    CBLDocument_ID(document._ref),
-                    Some(c_document_change_listener),
-                    callback,
-                ),
-            }
+            let callback = listener as *mut std::ffi::c_void;
+            ListenerToken::new(CBLDatabase_AddDocumentChangeListener(
+                self.get_ref(),
+                CBLDocument_ID(document.get_ref()),
+                Some(c_document_change_listener),
+                callback,
+            ))
         }
     }
 }
 
 //////// DOCUMENT API:
 
+impl Default for Document {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Document {
     /** Creates a new, empty document in memory, with an automatically generated unique ID.
     It will not be added to a database until saved. */
     pub fn new() -> Self {
-        unsafe { Document::wrap(CBLDocument_Create()) }
+        unsafe { Self::wrap(CBLDocument_Create()) }
     }
 
     /** Creates a new, empty document in memory, with the given ID.
     It will not be added to a database until saved. */
     pub fn new_with_id(id: &str) -> Self {
-        unsafe { Document::wrap(CBLDocument_CreateWithID(as_slice(id)._ref)) }
+        unsafe { Self::wrap(CBLDocument_CreateWithID(from_str(id).get_ref())) }
     }
 
     /** Wrap a CBLDocument as a Document.
     Increment the reference-count for the CBLDocument. */
-    pub(crate) fn retain(_ref: *mut CBLDocument) -> Self {
-        unsafe { Document { _ref: retain(_ref) } }
+    pub(crate) fn retain(cbl_ref: *mut CBLDocument) -> Self {
+        unsafe {
+            Self {
+                cbl_ref: retain(cbl_ref),
+            }
+        }
     }
 
     /** Wrap a CBLDocument as a Document.
     The CBLDocument reference-count should already have been incremented from a type-safe source. */
-    pub(crate) fn wrap(_ref: *mut CBLDocument) -> Self {
-        Document { _ref }
-    }
-
-    pub(crate) fn get_ref(&self) -> *mut CBLDocument {
-        self._ref
+    pub(crate) const fn wrap(cbl_ref: *mut CBLDocument) -> Self {
+        Self { cbl_ref }
     }
 
     /** Returns the document's ID. */
     pub fn id(&self) -> &str {
-        unsafe { CBLDocument_ID(self._ref).as_str().unwrap() }
+        unsafe { CBLDocument_ID(self.get_ref()).as_str().unwrap() }
     }
 
     /** Returns a document's revision ID, which is a short opaque string that's guaranteed to be
     unique to every change made to the document.
     If the document doesn't exist yet, this method returns None. */
     pub fn revision_id(&self) -> Option<&str> {
-        unsafe { CBLDocument_RevisionID(self._ref).as_str() }
+        unsafe { CBLDocument_RevisionID(self.get_ref()).as_str() }
     }
 
     /** Returns a document's current sequence in the local database.
@@ -288,38 +322,38 @@ impl Document {
     will have a greater sequence number than one saved earlier, so sequences may be used as an
     abstract 'clock' to tell relative modification times. */
     pub fn sequence(&self) -> u64 {
-        unsafe { CBLDocument_Sequence(self._ref) }
+        unsafe { CBLDocument_Sequence(self.get_ref()) }
     }
 
     /** Returns a document's properties as a dictionary.
     This dictionary cannot be mutated; call `mutable_properties` if you want to make
     changes to the document's properties. */
-    pub fn properties<'a>(&'a self) -> Dict {
-        unsafe { Dict::wrap(CBLDocument_Properties(self._ref), self) }
+    pub fn properties(&self) -> Dict {
+        unsafe { Dict::wrap(CBLDocument_Properties(self.get_ref()), self) }
     }
 
     /** Returns a document's properties as an mutable dictionary. Any changes made to this
     dictionary will be saved to the database when this Document instance is saved. */
     pub fn mutable_properties(&mut self) -> MutableDict {
-        unsafe { MutableDict::adopt(CBLDocument_MutableProperties(self._ref)) }
+        unsafe { MutableDict::adopt(CBLDocument_MutableProperties(self.get_ref())) }
     }
 
     /** Replaces a document's properties with the contents of the dictionary.
     The dictionary is retained, not copied, so further changes _will_ affect the document. */
-    pub fn set_properties(&mut self, properties: MutableDict) {
-        unsafe { CBLDocument_SetProperties(self._ref, properties._ref) }
+    pub fn set_properties(&mut self, properties: &MutableDict) {
+        unsafe { CBLDocument_SetProperties(self.get_ref(), properties.get_ref()) }
     }
 
     /** Returns a document's properties as a JSON string. */
     pub fn properties_as_json(&self) -> String {
-        unsafe { CBLDocument_CreateJSON(self._ref).to_string().unwrap() }
+        unsafe { CBLDocument_CreateJSON(self.get_ref()).to_string().unwrap() }
     }
 
     /** Sets a mutable document's properties from a JSON string. */
     pub fn set_properties_as_json(&mut self, json: &str) -> Result<()> {
         unsafe {
             let mut err = CBLError::default();
-            let ok = CBLDocument_SetJSON(self._ref, as_slice(json)._ref, &mut err);
+            let ok = CBLDocument_SetJSON(self.get_ref(), from_str(json).get_ref(), &mut err);
             check_failure(ok, &err)
         }
     }
@@ -327,12 +361,12 @@ impl Document {
 
 impl Drop for Document {
     fn drop(&mut self) {
-        unsafe { release(self._ref) }
+        unsafe { release(self.get_ref()) }
     }
 }
 
 impl Clone for Document {
     fn clone(&self) -> Self {
-        Document::retain(self._ref)
+        Self::retain(self.get_ref())
     }
 }

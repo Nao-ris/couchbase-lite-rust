@@ -18,6 +18,18 @@
 //#![allow(unused_imports)]
 //#![allow(dead_code)]
 
+#![allow(clippy::missing_safety_doc)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::wrong_self_convention)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::copy_iterator)]
+#![allow(clippy::missing_panics_doc)]
+
 #[macro_use]
 extern crate enum_primitive;
 
@@ -31,11 +43,14 @@ pub mod fleece_mutable;
 pub mod logging;
 pub mod query;
 pub mod replicator;
-
-mod c_api;
 pub mod slice;
 
-use self::c_api::*;
+mod c_api;
+
+use self::c_api::{
+    CBLListenerToken, CBLListener_Remove, CBLRefCounted, CBL_DumpInstances, CBL_InstanceCount,
+    CBL_Release, CBL_Retain,
+};
 
 //////// RE-EXPORT:
 
@@ -50,18 +65,37 @@ pub use replicator::*;
 
 //////// TOP-LEVEL TYPES:
 
+pub trait CblRef {
+    type Output;
+    fn get_ref(&self) -> Self::Output;
+}
+
+#[derive(Debug, Clone, Copy)]
 /// A time value for document expiration. Defined as milliseconds since the Unix epoch (1/1/1970.)
 pub struct Timestamp(pub i64);
 
 /// An opaque token representing a registered listener.
 /// When this object is dropped, the listener function will not be called again.
 pub struct ListenerToken {
-    _ref: *mut CBLListenerToken,
+    cbl_ref: *mut CBLListenerToken,
+}
+
+impl ListenerToken {
+    pub const fn new(cbl_ref: *mut CBLListenerToken) -> Self {
+        Self { cbl_ref }
+    }
+}
+
+impl CblRef for ListenerToken {
+    type Output = *mut CBLListenerToken;
+    fn get_ref(&self) -> Self::Output {
+        self.cbl_ref
+    }
 }
 
 impl Drop for ListenerToken {
     fn drop(&mut self) {
-        unsafe { CBLListener_Remove(self._ref) }
+        unsafe { CBLListener_Remove(self.get_ref()) }
     }
 }
 
@@ -81,9 +115,9 @@ pub fn dump_instances() {
 //////// REFCOUNT SUPPORT (INTERNAL)
 
 pub(crate) unsafe fn retain<T>(cbl_ref: *mut T) -> *mut T {
-    CBL_Retain(cbl_ref as *mut CBLRefCounted) as *mut T
+    CBL_Retain(cbl_ref.cast::<CBLRefCounted>()).cast::<T>()
 }
 
 pub(crate) unsafe fn release<T>(cbl_ref: *mut T) {
-    CBL_Release(cbl_ref as *mut CBLRefCounted)
+    CBL_Release(cbl_ref.cast::<CBLRefCounted>());
 }
