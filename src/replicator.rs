@@ -545,7 +545,7 @@ impl<'c> From<ReplicatorConfiguration<'c>>
 /** A background task that syncs a \ref Database with a remote server or peer. */
 pub struct Replicator {
     _ref: *mut CBLReplicator,
-    _cbl_config: Option<Box<CBLReplicatorConfiguration>>,
+    _cbl_config: Option<CBLReplicatorConfiguration>,
     _context: Option<Box<ReplicationConfigurationContext>>,
 }
 
@@ -554,10 +554,9 @@ impl Replicator {
     pub fn new(config: ReplicatorConfiguration) -> Result<Replicator> {
         unsafe {
             let (cbl_config, context) = config.into();
-            let cbl_config: Box<CBLReplicatorConfiguration> = Box::new(cbl_config);
 
             let mut error = CBLError::default();
-            let replicator = CBLReplicator_Create(&*cbl_config, &mut error as *mut CBLError);
+            let replicator = CBLReplicator_Create(&cbl_config, &mut error as *mut CBLError);
 
             check_error(&error).map(|()| Replicator {
                 _ref: replicator,
