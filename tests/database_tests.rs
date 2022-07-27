@@ -23,10 +23,14 @@ use lazy_static::lazy_static;
 
 pub mod utils;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 //////// TESTS:
 
+// Only for buffer_notifications test
 lazy_static! {
     static ref BUFFER_NOTIFICATIONS: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     static ref DOCUMENT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
@@ -69,10 +73,35 @@ fn db_properties() {
 
 #[test]
 fn add_listener() {
+    utils::with_db(|db| {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let listener_token = db.add_listener(Box::new(move |_, doc_ids| {
+            if doc_ids.first().unwrap() == "document" {
+                sender.send(true).unwrap();
+            }
+        }));
+
+        let mut doc = Document::new_with_id("document");
+        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+            .unwrap();
+
+        receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+
+        drop(listener_token);
+    });
+}
+
+#[test]
+fn buffer_notifications() {
+    utils::set_static(&BUFFER_NOTIFICATIONS, false);
     utils::set_static(&DOCUMENT_DETECTED, false);
 
     utils::with_db(|db| {
-        let listener_token = db.add_listener(Box::new(|_, doc_ids| {
+        db.buffer_notifications(|_| {
+            utils::set_static(&BUFFER_NOTIFICATIONS, true);
+        });
+
+        let listener_token = db.add_listener(Box::new(move |_, doc_ids| {
             if doc_ids.first().unwrap() == "document" {
                 utils::set_static(&DOCUMENT_DETECTED, true);
             }
@@ -82,6 +111,19 @@ fn add_listener() {
         db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
             .unwrap();
 
+        assert!(!utils::check_static_with_wait(
+            &DOCUMENT_DETECTED,
+            true,
+            None
+        ));
+        assert!(utils::check_static_with_wait(
+            &BUFFER_NOTIFICATIONS,
+            true,
+            None
+        ));
+
+        db.send_notifications();
+
         assert!(utils::check_static_with_wait(
             &DOCUMENT_DETECTED,
             true,
@@ -90,54 +132,6 @@ fn add_listener() {
 
         drop(listener_token);
     });
-}
-
-#[cfg(feature = "flaky-test")]
-mod flaky {
-    use super::*;
-
-    #[test]
-    fn buffer_notifications() {
-        utils::set_static(&BUFFER_NOTIFICATIONS, false);
-        utils::set_static(&DOCUMENT_DETECTED, false);
-
-        utils::with_db(|db| {
-            db.buffer_notifications(|_| {
-                utils::set_static(&BUFFER_NOTIFICATIONS, true);
-            });
-
-            let listener_token = db.add_listener(|_, doc_ids| {
-                if doc_ids.first().unwrap() == "document" {
-                    utils::set_static(&DOCUMENT_DETECTED, true);
-                }
-            });
-
-            let mut doc = Document::new_with_id("document");
-            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
-                .unwrap();
-
-            assert!(!utils::check_static_with_wait(
-                &DOCUMENT_DETECTED,
-                true,
-                None
-            ));
-            assert!(utils::check_static_with_wait(
-                &BUFFER_NOTIFICATIONS,
-                true,
-                None
-            ));
-
-            db.send_notifications();
-
-            assert!(utils::check_static_with_wait(
-                &DOCUMENT_DETECTED,
-                true,
-                None
-            ));
-
-            drop(listener_token);
-        });
-    }
 }
 
 /*

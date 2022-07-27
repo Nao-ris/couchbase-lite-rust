@@ -1,2 +1,3 @@
 leak:libc
 leak:*generate_replication_configuration*
+leak:*add_listener*
