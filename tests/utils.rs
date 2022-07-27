@@ -77,7 +77,7 @@ where
 pub struct ReplicationTestConfiguration {
     pub replicator_type: ReplicatorType,
     pub continuous: bool,
-    pub document_ids: MutableArray,
+    pub document_ids: Array,
     pub push_filter: Option<ReplicationFilter>,
     pub pull_filter: Option<ReplicationFilter>,
     pub conflict_resolver: Option<ConflictResolver>,
@@ -90,7 +90,7 @@ impl Default for ReplicationTestConfiguration {
         Self {
             replicator_type: ReplicatorType::PushAndPull,
             continuous: true,
-            document_ids: MutableArray::default(),
+            document_ids: Array::default(),
             push_filter: None,
             pull_filter: None,
             conflict_resolver: None,
@@ -119,7 +119,7 @@ fn generate_replication_configuration(
         headers: HashMap::new(),
         pinned_server_certificate: None,
         trusted_root_certificates: None,
-        channels: MutableArray::default(),
+        channels: Array::default(),
         document_ids: config.document_ids,
         push_filter: config.push_filter,
         pull_filter: config.pull_filter,

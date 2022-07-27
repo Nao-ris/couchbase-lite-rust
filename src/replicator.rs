@@ -23,7 +23,7 @@ use std::{
 };
 use crate::{
     CblRef, Database, Dict, Document, Error, ListenerToken, MutableDict, Result, check_error,
-    release, retain,
+    release, retain, Array,
     slice::{from_str, from_bytes, self},
     c_api::{
         CBLAuth_CreatePassword, CBLAuth_CreateSession, CBLAuthenticator, CBLDocument,
@@ -39,7 +39,6 @@ use crate::{
         kCBLReplicatorConnecting, kCBLReplicatorIdle, kCBLReplicatorOffline, kCBLReplicatorStopped,
         kCBLReplicatorTypePull, kCBLReplicatorTypePush, kCBLReplicatorTypePushAndPull,
     },
-    MutableArray,
 };
 
 // WARNING: THIS API IS UNIMPLEMENTED SO FAR
@@ -450,8 +449,8 @@ pub struct ReplicatorConfiguration {
     pub pinned_server_certificate: Option<Vec<u8>>, // An X.509 cert to "pin" TLS connections to (PEM or DER)
     pub trusted_root_certificates: Option<Vec<u8>>, // Set of anchor certs (PEM format)
     //-- Filtering:
-    pub channels: MutableArray, // Optional set of channels to pull from
-    pub document_ids: MutableArray, // Optional set of document IDs to replicate
+    pub channels: Array,     // Optional set of channels to pull from
+    pub document_ids: Array, // Optional set of document IDs to replicate
     pub push_filter: Option<ReplicationFilter>, // Optional callback to filter which docs are pushed
     pub pull_filter: Option<ReplicationFilter>, // Optional callback to validate incoming docs
     pub conflict_resolver: Option<ConflictResolver>, // Optional conflict-resolver callback
