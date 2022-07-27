@@ -74,22 +74,23 @@ where
 
 // Replication
 
-pub struct ReplicationTestConfiguration<'a> {
+pub struct ReplicationTestConfiguration {
     pub replicator_type: ReplicatorType,
     pub continuous: bool,
-    pub document_ids: Array<'a>,
+    pub document_ids: MutableArray,
     pub push_filter: Option<ReplicationFilter>,
     pub pull_filter: Option<ReplicationFilter>,
     pub conflict_resolver: Option<ConflictResolver>,
     pub property_encryptor: Option<PropertyEncryptor>,
     pub property_decryptor: Option<PropertyDecryptor>,
 }
-impl<'a> Default for ReplicationTestConfiguration<'a> {
+
+impl Default for ReplicationTestConfiguration {
     fn default() -> Self {
         Self {
             replicator_type: ReplicatorType::PushAndPull,
             continuous: true,
-            document_ids: Array::default(),
+            document_ids: MutableArray::default(),
             push_filter: None,
             pull_filter: None,
             conflict_resolver: None,
@@ -99,11 +100,11 @@ impl<'a> Default for ReplicationTestConfiguration<'a> {
     }
 }
 
-fn generate_replication_configuration<'a>(
+fn generate_replication_configuration(
     local_db: &Database,
     central_db: &Database,
-    config: ReplicationTestConfiguration<'a>,
-) -> ReplicatorConfiguration<'a> {
+    config: ReplicationTestConfiguration,
+) -> ReplicatorConfiguration {
     ReplicatorConfiguration {
         database: local_db.clone(),
         endpoint: Endpoint::new_with_local_db(central_db),
@@ -118,8 +119,8 @@ fn generate_replication_configuration<'a>(
         headers: HashMap::new(),
         pinned_server_certificate: None,
         trusted_root_certificates: None,
-        channels: Array::default(),
-        document_ids: config.document_ids,
+        channels: MutableArray::default(),
+        document_ids: MutableArray::default(),
         push_filter: config.push_filter,
         pull_filter: config.pull_filter,
         conflict_resolver: config.conflict_resolver,

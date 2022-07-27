@@ -393,7 +393,7 @@ struct ReplicationConfigurationContext {
 }
 
 /** The configuration of a replicator. */
-pub struct ReplicatorConfiguration<'c> {
+pub struct ReplicatorConfiguration {
     pub database: Database,              // The database to replicate
     pub endpoint: Endpoint,              // The address of the other database to replicate with
     pub replicator_type: ReplicatorType, // Push, pull or both
@@ -419,11 +419,11 @@ pub struct ReplicatorConfiguration<'c> {
     pub proxy: Option<ProxySettings>, // HTTP client proxy settings
     pub headers: HashMap<String, String>, // Extra HTTP headers to add to the WebSocket request
     //-- TLS settings:
-    pub pinned_server_certificate: Option<&'c [u8]>, // An X.509 cert to "pin" TLS connections to (PEM or DER)
-    pub trusted_root_certificates: Option<&'c [u8]>, // Set of anchor certs (PEM format)
+    pub pinned_server_certificate: Option<Vec<u8>>, // An X.509 cert to "pin" TLS connections to (PEM or DER)
+    pub trusted_root_certificates: Option<Vec<u8>>, // Set of anchor certs (PEM format)
     //-- Filtering:
-    pub channels: Array<'c>,     // Optional set of channels to pull from
-    pub document_ids: Array<'c>, // Optional set of document IDs to replicate
+    pub channels: MutableArray, // Optional set of channels to pull from
+    pub document_ids: MutableArray, // Optional set of document IDs to replicate
     pub push_filter: Option<ReplicationFilter>, // Optional callback to filter which docs are pushed
     pub pull_filter: Option<ReplicationFilter>, // Optional callback to validate incoming docs
     pub conflict_resolver: Option<ConflictResolver>, // Optional conflict-resolver callback
@@ -432,54 +432,13 @@ pub struct ReplicatorConfiguration<'c> {
     pub property_decryptor: Option<PropertyDecryptor>, //< Optional callback to decrypt encrypted \ref CBLEncryptable values.
 }
 
-impl<'c> From<&'c CBLReplicatorConfiguration> for ReplicatorConfiguration<'c> {
-    fn from(config: &'c CBLReplicatorConfiguration) -> Self {
-        unsafe {
-            let context: *const ReplicationConfigurationContext =
-                std::mem::transmute(config.context);
-
-            ReplicatorConfiguration {
-                database: Database::wrap(config.database),
-                endpoint: Endpoint {
-                    _ref: config.endpoint,
-                },
-                replicator_type: config.replicatorType.into(),
-                continuous: config.continuous,
-                disable_auto_purge: config.disableAutoPurge,
-                max_attempts: config.maxAttempts,
-                max_attempt_wait_time: config.maxAttemptWaitTime,
-                heartbeat: config.heartbeat,
-                authenticator: if config.authenticator.is_null() {
-                    None
-                } else {
-                    Some(Authenticator {
-                        _ref: retain(config.authenticator),
-                    })
-                },
-                proxy: config.proxy.as_ref().map(|proxy| proxy.into()),
-                headers: Dict::wrap(config.headers, &config.headers)
-                    .mutable_copy()
-                    .to_hashmap(),
-                pinned_server_certificate: config.pinnedServerCertificate.as_byte_array(),
-                trusted_root_certificates: config.trustedRootCertificates.as_byte_array(),
-                channels: Array::wrap(config.channels, &config.channels),
-                document_ids: Array::wrap(config.documentIDs, &config.documentIDs),
-                push_filter: (*context).push_filter,
-                pull_filter: (*context).pull_filter,
-                conflict_resolver: (*context).conflict_resolver,
-                property_encryptor: (*context).property_encryptor,
-                property_decryptor: (*context).property_encryptor,
-            }
-        }
-    }
-}
-impl<'c> From<ReplicatorConfiguration<'c>>
+impl From<ReplicatorConfiguration>
     for (
         CBLReplicatorConfiguration,
         Box<ReplicationConfigurationContext>,
     )
 {
-    fn from(config: ReplicatorConfiguration<'c>) -> Self {
+    fn from(config: ReplicatorConfiguration) -> Self {
         let context: Box<ReplicationConfigurationContext> =
             Box::new(ReplicationConfigurationContext {
                 push_filter: config.push_filter,
@@ -513,11 +472,11 @@ impl<'c> From<ReplicatorConfiguration<'c>>
                     headers: MutableDict::from_hashmap(&config.headers).as_dict()._ref,
                     pinnedServerCertificate: config
                         .pinned_server_certificate
-                        .map(|c| slice::bytes_as_slice(c)._ref)
+                        .map(|c| slice::bytes_as_slice(&c)._ref)
                         .unwrap_or(slice::NULL_SLICE),
                     trustedRootCertificates: config
                         .trusted_root_certificates
-                        .map(|c| slice::bytes_as_slice(c)._ref)
+                        .map(|c| slice::bytes_as_slice(&c)._ref)
                         .unwrap_or(slice::NULL_SLICE),
                     channels: config.channels._ref,
                     documentIDs: config.document_ids._ref,
@@ -563,14 +522,6 @@ impl Replicator {
                 _cbl_config: Some(cbl_config),
                 _context: Some(context),
             })
-        }
-    }
-
-    /** Returns the configuration of an existing replicator. */
-    pub fn config(&self) -> Option<ReplicatorConfiguration> {
-        unsafe {
-            let cbl_config = CBLReplicator_Config(self._ref);
-            cbl_config.as_ref().map(|c| c.into())
         }
     }
 

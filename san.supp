@@ -1,1 +1,2 @@
 leak:libc
+leak:*generate_replication_configuration*
