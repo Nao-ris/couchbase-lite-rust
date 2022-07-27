@@ -4,7 +4,7 @@ on: push
 
 env:
   CARGO_TERM_COLOR: always
-  LIBCLANG_PATH: /usr/lib/llvm-11/lib/
+  LIBCLANG_PATH: /usr/lib/llvm-14/lib/
 
 jobs:
   build:
