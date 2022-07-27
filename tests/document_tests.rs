@@ -3,8 +3,6 @@ extern crate couchbase_lite;
 extern crate lazy_static;
 
 use self::couchbase_lite::*;
-use lazy_static::lazy_static;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub mod utils;
@@ -179,10 +177,6 @@ fn database_save_document_resolving() {
     });
 }
 
-lazy_static! {
-    static ref DOCUMENT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-}
-
 #[test]
 fn database_purge_document() {
     utils::with_db(|db| {
@@ -228,36 +222,30 @@ fn database_document_expiration() {
 
 #[test]
 fn database_add_document_change_listener() {
-    utils::set_static(&DOCUMENT_DETECTED, false);
-
     utils::with_db(|db| {
+        let (sender, receiver) = std::sync::mpsc::channel();
         let mut document = Document::new_with_id("foo");
         db.save_document_with_concurency_control(&mut document, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
-        let listener_token = db.add_document_change_listener(&document, |_, document_id| {
-            if let Some(id) = document_id {
-                assert_eq!(id, "foo");
-                utils::set_static(&DOCUMENT_DETECTED, true);
-            }
-        });
+        let listener_token = db.add_document_change_listener(
+            &document,
+            Box::new(move |_, document_id| {
+                if let Some(id) = document_id {
+                    assert_eq!(id, "foo");
+                    sender.send(true).unwrap();
+                }
+            }),
+        );
         document.mutable_properties().at("foo").put_i64(1);
         db.save_document_with_concurency_control(&mut document, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
-        assert!(utils::check_static_with_wait(
-            &DOCUMENT_DETECTED,
-            true,
-            None
-        ));
 
-        utils::set_static(&DOCUMENT_DETECTED, false);
+        receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+
         let mut document = Document::new_with_id("bar");
         db.save_document_with_concurency_control(&mut document, ConcurrencyControl::FailOnConflict)
             .expect("save_document");
-        assert!(utils::check_static_with_wait(
-            &DOCUMENT_DETECTED,
-            false,
-            None
-        ));
+        assert!(receiver.recv_timeout(Duration::from_secs(10)).is_err());
         drop(listener_token);
     });
 }

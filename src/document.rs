@@ -73,17 +73,16 @@ unsafe extern "C" fn c_conflict_handler(
 
 /**  A document change listener lets you detect changes made to a specific document after they
 are persisted to the database. */
-type ChangeListener = fn(&Database, Option<String>);
+type ChangeListener = Box<dyn Fn(&Database, Option<String>)>;
+
 #[no_mangle]
 unsafe extern "C" fn c_document_change_listener(
     context: *mut ::std::os::raw::c_void,
     db: *const CBLDatabase,
     c_doc_id: FLString,
 ) {
-    let callback: ChangeListener = std::mem::transmute(context);
-
+    let callback: Box<ChangeListener> = Box::from_raw(context as *mut _);
     let database = Database::retain(db as *mut CBLDatabase);
-
     callback(&database, c_doc_id.to_string());
 }
 
@@ -257,12 +256,12 @@ impl Database {
         listener: ChangeListener,
     ) -> ListenerToken {
         unsafe {
-            let callback = listener as *mut std::ffi::c_void;
+            let callback: Box<ChangeListener> = Box::new(Box::new(listener));
             ListenerToken::new(CBLDatabase_AddDocumentChangeListener(
                 self.get_ref(),
                 CBLDocument_ID(document.get_ref()),
                 Some(c_document_change_listener),
-                callback,
+                Box::into_raw(callback) as *mut _,
             ))
         }
     }
