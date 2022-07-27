@@ -276,11 +276,9 @@ fn read_document_flags(flags: CBLDocumentFlags) -> (bool, bool) {
 when the replicator finds a newer server-side revision of a document that also has local
 changes. The local and remote changes must be resolved before the document can be pushed
 to the server. */
-pub type ConflictResolver = fn(
-    document_id: &str,
-    local_document: Option<Document>,
-    remote_document: Option<Document>,
-) -> Option<Document>;
+pub type ConflictResolver =
+    Box<dyn Fn(&str, Option<Document>, Option<Document>) -> Option<Document>>;
+
 unsafe extern "C" fn c_replication_conflict_resolver(
     context: *mut ::std::os::raw::c_void,
     document_id: FLString,
@@ -303,6 +301,7 @@ unsafe extern "C" fn c_replication_conflict_resolver(
 
     (*repl_conf_context)
         .conflict_resolver
+        .as_ref()
         .map_or(ptr::null(), |callback| {
             callback(&doc_id, local_document, remote_document)
                 .map_or(ptr::null(), |d| d.get_ref() as *const CBLDocument)
@@ -517,6 +516,7 @@ impl From<ReplicatorConfiguration>
                         .and(Some(c_replication_pull_filter)),
                     conflictResolver: (*context)
                         .conflict_resolver
+                        .as_ref()
                         .and(Some(c_replication_conflict_resolver)),
                     context: std::mem::transmute(&*context),
                     propertyEncryptor: (*context)

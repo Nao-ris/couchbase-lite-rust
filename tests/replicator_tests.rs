@@ -22,7 +22,10 @@ use self::couchbase_lite::*;
 use encryptable::Encryptable;
 use lazy_static::lazy_static;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 pub mod utils;
 
@@ -251,19 +254,17 @@ fn push_and_pull_filter() {
     );
 }
 
-lazy_static! {
-    static ref CONFLICT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-}
-
 #[test]
 fn conflict_resolver() {
-    utils::set_static(&CONFLICT_DETECTED, false);
+    let (sender, receiver) = std::sync::mpsc::channel();
 
     let config1 = utils::ReplicationTestConfiguration {
-        conflict_resolver: Some(|_document_id, _local_document, remote_document| {
-            utils::set_static(&CONFLICT_DETECTED, true);
-            remote_document
-        }),
+        conflict_resolver: Some(Box::new(
+            move |_document_id, _local_document, remote_document| {
+                sender.send(true).unwrap();
+                remote_document
+            },
+        )),
         ..Default::default()
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
@@ -322,11 +323,7 @@ fn conflict_resolver() {
             repl1.start(false);
 
             // Check conflict was detected
-            assert!(utils::check_static_with_wait(
-                &CONFLICT_DETECTED,
-                true,
-                None
-            ));
+            receiver.recv_timeout(Duration::from_secs(1)).unwrap();
 
             // Check DB 2 version is in DB 1
             assert!(utils::check_callback_with_wait(
