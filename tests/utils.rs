@@ -6,7 +6,6 @@ use self::tempdir::TempDir;
 
 use std::{
     collections::HashMap,
-    ptr,
     sync::{Arc, Mutex, MutexGuard},
     thread, time,
 };
@@ -47,7 +46,7 @@ where
     let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
     let cfg = DatabaseConfiguration {
         directory: tmp_dir.path(),
-        encryption_key: ptr::null_mut(),
+        encryption_key: None,
     };
     let mut db = Database::open(DB_NAME, Some(cfg)).expect("open db");
     assert!(Database::exists(DB_NAME, tmp_dir.path()));
@@ -142,15 +141,15 @@ pub fn with_three_dbs<F>(
     let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
     let cfg1 = DatabaseConfiguration {
         directory: tmp_dir.path(),
-        encryption_key: ptr::null_mut(),
+        encryption_key: None,
     };
     let cfg2 = DatabaseConfiguration {
         directory: tmp_dir.path(),
-        encryption_key: ptr::null_mut(),
+        encryption_key: None,
     };
     let cfg3 = DatabaseConfiguration {
         directory: tmp_dir.path(),
-        encryption_key: ptr::null_mut(),
+        encryption_key: None,
     };
     let mut local_db1 = Database::open("local1", Some(cfg1)).expect("open db local1");
     assert!(Database::exists("local1", tmp_dir.path()));

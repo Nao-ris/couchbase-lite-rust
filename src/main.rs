@@ -21,14 +21,12 @@ extern crate tempdir;
 use couchbase_lite::{ConcurrencyControl, Database, DatabaseConfiguration, Document, FleeceReference};
 use tempdir::TempDir;
 
-use std::ptr;
-
 fn main() {
     // Create a new database in a temporary directory:
     let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
     let cfg = DatabaseConfiguration {
         directory: tmp_dir.path(),
-        encryption_key: ptr::null_mut(),
+        encryption_key: None,
     };
     let mut db = Database::open("main_db", Some(cfg)).expect("open db");
 

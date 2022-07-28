@@ -22,11 +22,12 @@ use crate::{
     c_api::{
         CBLDatabase, CBLDatabaseConfiguration, CBLDatabaseConfiguration_Default,
         CBLDatabase_AddChangeListener, CBLDatabase_BeginTransaction,
-        CBLDatabase_BufferNotifications, CBLDatabase_Count, CBLDatabase_Delete,
-        CBLDatabase_EndTransaction, CBLDatabase_Name, CBLDatabase_Open, CBLDatabase_Path,
-        CBLDatabase_PerformMaintenance, CBLDatabase_SendNotifications, CBLEncryptionKey, CBLError,
-        CBL_DatabaseExists, CBL_DeleteDatabase, FLString, kCBLMaintenanceTypeCompact,
-        kCBLMaintenanceTypeFullOptimize, kCBLMaintenanceTypeIntegrityCheck,
+        CBLDatabase_BufferNotifications, CBLDatabase_ChangeEncryptionKey, CBLDatabase_Close,
+        CBLDatabase_Count, CBLDatabase_Delete, CBLDatabase_EndTransaction, CBLDatabase_Name,
+        CBLDatabase_Open, CBLDatabase_Path, CBLDatabase_PerformMaintenance,
+        CBLDatabase_SendNotifications, CBLEncryptionKey, CBLError, CBL_DatabaseExists,
+        CBL_DeleteDatabase, CBLEncryptionKey_FromPassword, FLString, kCBLMaintenanceTypeCompact,
+        kCBLEncryptionNone, kCBLMaintenanceTypeFullOptimize, kCBLMaintenanceTypeIntegrityCheck,
         kCBLMaintenanceTypeOptimize, kCBLMaintenanceTypeReindex,
     },
 };
@@ -34,10 +35,64 @@ use crate::{
 use std::path::{Path, PathBuf};
 use std::ptr;
 
+#[derive(Debug)]
+pub struct EncryptionKey {
+    cbl_ref: *mut CBLEncryptionKey,
+}
+
+impl EncryptionKey {
+    pub(crate) fn retain(cbl_ref: *mut CBLEncryptionKey) -> Self {
+        Self {
+            cbl_ref: unsafe { retain(cbl_ref) },
+        }
+    }
+
+    pub(crate) const fn wrap(cbl_ref: *mut CBLEncryptionKey) -> Self {
+        Self { cbl_ref }
+    }
+
+    pub fn new_from_password(password: String) -> Option<Self> {
+        unsafe {
+            let key = CBLEncryptionKey {
+                algorithm: kCBLEncryptionNone,
+                bytes: [0; 32],
+            };
+            let key = Box::new(key);
+            let key = Box::into_raw(key);
+
+            if CBLEncryptionKey_FromPassword(key, from_str(password.as_str()).get_ref()) {
+                Some(Self::wrap(key))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+impl CblRef for EncryptionKey {
+    type Output = *mut CBLEncryptionKey;
+    fn get_ref(&self) -> Self::Output {
+        self.cbl_ref
+    }
+}
+
+impl Drop for EncryptionKey {
+    fn drop(&mut self) {
+        unsafe { release(self.get_ref()) }
+    }
+}
+
+impl Clone for EncryptionKey {
+    fn clone(&self) -> Self {
+        Self::retain(self.get_ref())
+    }
+}
+
 /** Database configuration options. */
+#[derive(Debug, Clone)]
 pub struct DatabaseConfiguration<'a> {
     pub directory: &'a std::path::Path,
-    pub encryption_key: *mut CBLEncryptionKey,
+    pub encryption_key: Option<EncryptionKey>,
 }
 
 enum_from_primitive! {
@@ -121,8 +176,8 @@ impl Database {
             if let Some(cfg) = config {
                 let mut c_config: CBLDatabaseConfiguration = CBLDatabaseConfiguration_Default();
                 c_config.directory = from_str(cfg.directory.to_str().unwrap()).get_ref();
-                if let Some(encryption_key) = cfg.encryption_key.as_ref() {
-                    c_config.encryptionKey = *encryption_key;
+                if let Some(encryption_key) = cfg.encryption_key {
+                    c_config.encryptionKey = *encryption_key.get_ref();
                 }
                 return Self::_open(name, &c_config);
             }
@@ -171,6 +226,11 @@ impl Database {
 
     //////// OPERATIONS:
 
+    /** Closes an open database. */
+    pub fn close(self) -> Result<()> {
+        unsafe { check_bool(|error| CBLDatabase_Close(self.get_ref(), error)) }
+    }
+
     /** Closes and deletes a database. If there are any other connections to the database,
     an error is returned. */
     pub fn delete(self) -> Result<()> {
@@ -208,6 +268,15 @@ impl Database {
             }
         }
         result
+    }
+
+    /** Encrypts or decrypts a database, or changes its encryption key. */
+    pub fn change_encryption_key(&self, encryption_key: EncryptionKey) -> Result<()> {
+        unsafe {
+            check_bool(|error| {
+                CBLDatabase_ChangeEncryptionKey(self.get_ref(), encryption_key.get_ref(), error)
+            })
+        }
     }
 
     //////// ACCESSORS:

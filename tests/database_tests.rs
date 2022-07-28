@@ -16,9 +16,11 @@
 //
 
 extern crate couchbase_lite;
+extern crate tempdir;
 extern crate lazy_static;
 
 use self::couchbase_lite::*;
+use self::tempdir::TempDir;
 use lazy_static::lazy_static;
 
 pub mod utils;
@@ -69,6 +71,30 @@ fn db_properties() {
         assert_eq!(db.name(), utils::DB_NAME);
         assert_eq!(db.count(), 0);
     });
+}
+
+#[test]
+fn db_encryption_key() {
+    let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
+    let cfg_no_encryption = DatabaseConfiguration {
+        directory: tmp_dir.path(),
+        encryption_key: None,
+    };
+    let encryption_key = EncryptionKey::new_from_password("password1".to_string()).unwrap();
+    let cfg_encryption1 = DatabaseConfiguration {
+        directory: tmp_dir.path(),
+        encryption_key: Some(encryption_key.clone()),
+    };
+
+    assert!(Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).is_ok());
+    assert!(Database::open(utils::DB_NAME, Some(cfg_encryption1.clone())).is_err());
+
+    let db = Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).unwrap();
+    assert!(db.change_encryption_key(encryption_key).is_ok());
+    drop(db);
+
+    assert!(Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).is_err());
+    assert!(Database::open(utils::DB_NAME, Some(cfg_encryption1.clone())).is_ok());
 }
 
 #[test]
