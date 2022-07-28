@@ -206,7 +206,7 @@ impl fmt::Debug for MutableArray {
 
 impl fmt::Display for MutableArray {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        return f.write_str(&self.as_value().to_json());
+        f.write_str(&self.as_value().to_json())
     }
 }
 
@@ -296,8 +296,7 @@ impl MutableDict {
         unsafe { FLMutableDict_RemoveAll(self.get_ref()) }
     }
 
-    /*
-    pub fn to_hashmap(&self) -> HashMap<String, String> {
+    pub fn to_hashmap(self) -> HashMap<String, String> {
         self.into_iter()
             .map(|tuple| {
                 (
@@ -307,7 +306,6 @@ impl MutableDict {
             })
             .collect::<HashMap<String, String>>()
     }
-    */
 
     pub fn set_encryptable_value(dict: &Self, key: &str, encryptable: &Encryptable) {
         unsafe {

@@ -20,12 +20,7 @@ extern crate lazy_static;
 
 use self::couchbase_lite::*;
 use encryptable::Encryptable;
-use lazy_static::lazy_static;
-
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{time::Duration};
 
 pub mod utils;
 

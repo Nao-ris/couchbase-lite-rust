@@ -33,7 +33,7 @@ fn query() {
         row = (&results).next().unwrap();
         i = row.get(0);
         s = row.get(1);
-        // assert_eq!(i.as_i64().unwrap(), 3);
+        assert_eq!(i.as_i64().unwrap(), 3);
         assert_eq!(s.as_string().unwrap(), "three");
         assert_eq!(row.as_dict().to_json(), r#"{"i":3,"s":"three"}"#);
 

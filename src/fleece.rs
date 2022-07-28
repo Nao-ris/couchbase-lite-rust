@@ -573,7 +573,7 @@ impl Dict {
 
     pub fn to_keys_hash_set(&self) -> HashSet<String> {
         self.into_iter()
-            .map(|tuple| tuple.0.to_string())
+            .map(|tuple| tuple.0)
             .collect::<HashSet<String>>()
     }
 }
