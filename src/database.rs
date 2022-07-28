@@ -34,11 +34,10 @@ use crate::{
 
 use std::path::{Path, PathBuf};
 use std::ptr;
-use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct EncryptionKey {
-    cbl_ref: Rc<CBLEncryptionKey>,
+    cbl_ref: Box<CBLEncryptionKey>,
 }
 
 impl EncryptionKey {
@@ -49,7 +48,7 @@ impl EncryptionKey {
                 bytes: [0; 32],
             };
             let encryption_key = EncryptionKey {
-                cbl_ref: Rc::new(key),
+                cbl_ref: Box::new(key),
             };
 
             if CBLEncryptionKey_FromPassword(
