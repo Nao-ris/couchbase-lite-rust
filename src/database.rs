@@ -34,30 +34,26 @@ use crate::{
 
 use std::path::{Path, PathBuf};
 use std::ptr;
+use std::rc::Rc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EncryptionKey {
-    cbl_ref: *mut CBLEncryptionKey,
+    cbl_ref: Rc<CBLEncryptionKey>,
 }
 
 impl EncryptionKey {
-    pub(crate) fn retain(cbl_ref: *mut CBLEncryptionKey) -> Self {
-        Self {
-            cbl_ref: unsafe { retain(cbl_ref) },
-        }
-    }
-
     pub fn new_from_password(password: String) -> Option<Self> {
         unsafe {
             let key = CBLEncryptionKey {
                 algorithm: kCBLEncryptionNone,
                 bytes: [0; 32],
             };
-            let key = Box::new(key);
-            let encryption_key = Self::retain(Box::into_raw(key));
+            let encryption_key = EncryptionKey {
+                cbl_ref: Rc::new(key),
+            };
 
             if CBLEncryptionKey_FromPassword(
-                encryption_key.get_ref(),
+                encryption_key.get_ref() as *mut CBLEncryptionKey,
                 from_str(password.as_str()).get_ref(),
             ) {
                 Some(encryption_key)
@@ -69,21 +65,9 @@ impl EncryptionKey {
 }
 
 impl CblRef for EncryptionKey {
-    type Output = *mut CBLEncryptionKey;
+    type Output = *const CBLEncryptionKey;
     fn get_ref(&self) -> Self::Output {
-        self.cbl_ref
-    }
-}
-
-impl Drop for EncryptionKey {
-    fn drop(&mut self) {
-        unsafe { release(self.get_ref()) }
-    }
-}
-
-impl Clone for EncryptionKey {
-    fn clone(&self) -> Self {
-        Self::retain(self.get_ref())
+        &*self.cbl_ref as *const CBLEncryptionKey
     }
 }
 
