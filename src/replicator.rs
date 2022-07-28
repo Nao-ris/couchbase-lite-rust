@@ -23,7 +23,7 @@ use std::{
 };
 use crate::{
     CblRef, Database, Dict, Document, Error, ListenerToken, MutableDict, Result, check_error,
-    release, retain,
+    release, retain, Array,
     slice::{from_str, from_bytes, self},
     c_api::{
         CBLAuth_CreatePassword, CBLAuth_CreateSession, CBLAuthenticator, CBLDocument,
@@ -39,7 +39,6 @@ use crate::{
         kCBLReplicatorConnecting, kCBLReplicatorIdle, kCBLReplicatorOffline, kCBLReplicatorStopped,
         kCBLReplicatorTypePull, kCBLReplicatorTypePush, kCBLReplicatorTypePushAndPull,
     },
-    MutableArray,
 };
 
 // WARNING: THIS API IS UNIMPLEMENTED SO FAR
@@ -450,8 +449,8 @@ pub struct ReplicatorConfiguration {
     pub pinned_server_certificate: Option<Vec<u8>>, // An X.509 cert to "pin" TLS connections to (PEM or DER)
     pub trusted_root_certificates: Option<Vec<u8>>, // Set of anchor certs (PEM format)
     //-- Filtering:
-    pub channels: MutableArray, // Optional set of channels to pull from
-    pub document_ids: MutableArray, // Optional set of document IDs to replicate
+    pub channels: Array,     // Optional set of channels to pull from
+    pub document_ids: Array, // Optional set of document IDs to replicate
     pub push_filter: Option<ReplicationFilter>, // Optional callback to filter which docs are pushed
     pub pull_filter: Option<ReplicationFilter>, // Optional callback to validate incoming docs
     pub conflict_resolver: Option<ConflictResolver>, // Optional conflict-resolver callback
@@ -460,52 +459,48 @@ pub struct ReplicatorConfiguration {
     pub property_decryptor: Option<PropertyDecryptor>, //< Optional callback to decrypt encrypted \ref CBLEncryptable values.
 }
 
-impl From<ReplicatorConfiguration>
-    for (
+impl ReplicatorConfiguration {
+    fn init(
+        self,
+    ) -> (
         CBLReplicatorConfiguration,
         Box<ReplicationConfigurationContext>,
-    )
-{
-    fn from(config: ReplicatorConfiguration) -> Self {
+    ) {
         let context: Box<ReplicationConfigurationContext> =
             Box::new(ReplicationConfigurationContext {
-                push_filter: config.push_filter,
-                pull_filter: config.pull_filter,
-                conflict_resolver: config.conflict_resolver,
-                property_encryptor: config.property_encryptor,
-                property_decryptor: config.property_decryptor,
+                push_filter: self.push_filter,
+                pull_filter: self.pull_filter,
+                conflict_resolver: self.conflict_resolver,
+                property_encryptor: self.property_encryptor,
+                property_decryptor: self.property_decryptor,
             });
 
-        let proxy = config
+        let proxy = self
             .proxy
             .map(|p| Box::new(p.into()))
             .map_or(ptr::null_mut(), Box::into_raw);
         unsafe {
             (
                 CBLReplicatorConfiguration {
-                    database: retain(config.database.get_ref()),
-                    endpoint: retain(config.endpoint.get_ref()),
-                    replicatorType: config.replicator_type.into(),
-                    continuous: config.continuous,
-                    disableAutoPurge: config.disable_auto_purge,
-                    maxAttempts: config.max_attempts,
-                    maxAttemptWaitTime: config.max_attempt_wait_time,
-                    heartbeat: config.heartbeat,
-                    authenticator: config
-                        .authenticator
-                        .map_or(ptr::null_mut(), |a| a.get_ref()),
+                    database: retain(self.database.get_ref()),
+                    endpoint: retain(self.endpoint.get_ref()),
+                    replicatorType: self.replicator_type.into(),
+                    continuous: self.continuous,
+                    disableAutoPurge: self.disable_auto_purge,
+                    maxAttempts: self.max_attempts,
+                    maxAttemptWaitTime: self.max_attempt_wait_time,
+                    heartbeat: self.heartbeat,
+                    authenticator: self.authenticator.map_or(ptr::null_mut(), |a| a.get_ref()),
                     proxy,
-                    headers: MutableDict::from_hashmap(&config.headers)
-                        .as_dict()
-                        .get_ref(),
-                    pinnedServerCertificate: config
+                    headers: MutableDict::from_hashmap(&self.headers).as_dict().get_ref(),
+                    pinnedServerCertificate: self
                         .pinned_server_certificate
                         .map_or(slice::NULL_SLICE, |c| slice::from_bytes(&c).get_ref()),
-                    trustedRootCertificates: config
+                    trustedRootCertificates: self
                         .trusted_root_certificates
                         .map_or(slice::NULL_SLICE, |c| slice::from_bytes(&c).get_ref()),
-                    channels: config.channels.get_ref(),
-                    documentIDs: config.document_ids.get_ref(),
+                    channels: self.channels.get_ref(),
+                    documentIDs: self.document_ids.get_ref(),
                     pushFilter: (*context)
                         .push_filter
                         .as_ref()
@@ -552,7 +547,7 @@ impl Replicator {
     /** Creates a replicator with the given configuration. */
     pub fn new(config: ReplicatorConfiguration) -> Result<Self> {
         unsafe {
-            let (cbl_config, context) = config.into();
+            let (cbl_config, context) = config.init();
 
             let mut error = CBLError::default();
             let replicator = CBLReplicator_Create(&cbl_config, std::ptr::addr_of_mut!(error));
