@@ -47,10 +47,6 @@ impl EncryptionKey {
         }
     }
 
-    pub(crate) const fn wrap(cbl_ref: *mut CBLEncryptionKey) -> Self {
-        Self { cbl_ref }
-    }
-
     pub fn new_from_password(password: String) -> Option<Self> {
         unsafe {
             let key = CBLEncryptionKey {
@@ -58,10 +54,13 @@ impl EncryptionKey {
                 bytes: [0; 32],
             };
             let key = Box::new(key);
-            let key = Box::into_raw(key);
+            let encryption_key = Self::retain(Box::into_raw(key));
 
-            if CBLEncryptionKey_FromPassword(key, from_str(password.as_str()).get_ref()) {
-                Some(Self::wrap(key))
+            if CBLEncryptionKey_FromPassword(
+                encryption_key.get_ref(),
+                from_str(password.as_str()).get_ref(),
+            ) {
+                Some(encryption_key)
             } else {
                 None
             }
@@ -271,7 +270,7 @@ impl Database {
     }
 
     /** Encrypts or decrypts a database, or changes its encryption key. */
-    pub fn change_encryption_key(&self, encryption_key: EncryptionKey) -> Result<()> {
+    pub fn change_encryption_key(&mut self, encryption_key: EncryptionKey) -> Result<()> {
         unsafe {
             check_bool(|error| {
                 CBLDatabase_ChangeEncryptionKey(self.get_ref(), encryption_key.get_ref(), error)

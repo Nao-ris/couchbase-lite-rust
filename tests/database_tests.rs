@@ -86,15 +86,31 @@ fn db_encryption_key() {
         encryption_key: Some(encryption_key.clone()),
     };
 
+    // Create database with no encryption & one document
+    {
+        let mut db = Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).unwrap();
+        let mut doc = Document::new_with_id("foo");
+        assert!(db
+            .save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+            .is_ok());
+    }
+
+    // Assert database can only be opened with no ecryption & doc can be retrieved, then add encryption
     assert!(Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).is_ok());
     assert!(Database::open(utils::DB_NAME, Some(cfg_encryption1.clone())).is_err());
+    {
+        let mut db = Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).unwrap();
+        assert!(db.get_document("foo").is_ok());
+        assert!(db.change_encryption_key(encryption_key).is_ok());
+    }
 
-    let db = Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).unwrap();
-    assert!(db.change_encryption_key(encryption_key).is_ok());
-    drop(db);
-
+    // Assert database can only be opened with ecryption & doc can be retrieved
     assert!(Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).is_err());
     assert!(Database::open(utils::DB_NAME, Some(cfg_encryption1.clone())).is_ok());
+    {
+        let db = Database::open(utils::DB_NAME, Some(cfg_encryption1.clone())).unwrap();
+        assert!(db.get_document("foo").is_ok());
+    }
 }
 
 #[test]
