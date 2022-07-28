@@ -296,8 +296,8 @@ impl MutableDict {
         unsafe { FLMutableDict_RemoveAll(self.get_ref()) }
     }
 
-    pub fn to_hashmap(self) -> HashMap<String, String> {
-        self.into_iter()
+    pub fn to_hashmap(&self) -> HashMap<String, String> {
+        self.iter()
             .map(|tuple| {
                 (
                     tuple.0.to_string(),

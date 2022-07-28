@@ -671,7 +671,9 @@ impl Iterator for DictIterator {
             if val.is_null() {
                 return None;
             }
-            let key = FLDictIterator_GetKeyString(&self.innards).as_str().unwrap();
+            let key = FLDictIterator_GetKeyString(&self.innards)
+                .as_str()
+                .unwrap_or_default();
             FLDictIterator_Next(&mut self.innards);
             Some((key.to_string(), Value { cbl_ref: val }))
         }
