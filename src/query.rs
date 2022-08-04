@@ -16,7 +16,8 @@
 //
 
 use crate::{
-    Array, CblRef, Database, Dict, MutableDict, Result, Value, failure, release, retain,
+    Array, CblRef, CouchbaseLiteError, Database, Dict, Error, MutableDict, Result, Value, failure,
+    release, retain,
     slice::from_str,
     c_api::{
         CBLDatabase_CreateQuery, CBLError, CBLQuery, CBLQueryLanguage, CBLQuery_ColumnCount,
@@ -122,8 +123,12 @@ impl Query {
     strategy. You can use this to help optimize the query: the word `SCAN` in the strategy
     indicates a linear scan of the entire database, which should be avoided by adding an index.
     The strategy will also show which index(es), if any, are used. */
-    pub fn explain(&self) -> String {
-        unsafe { CBLQuery_Explain(self.get_ref()).to_string().unwrap() }
+    pub fn explain(&self) -> Result<String> {
+        unsafe {
+            CBLQuery_Explain(self.get_ref())
+                .to_string()
+                .ok_or(Error::cbl_error(CouchbaseLiteError::InvalidQuery))
+        }
     }
 
     /** Runs the query, returning the results as a `ResultSet` object, which is an iterator
