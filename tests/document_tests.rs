@@ -291,6 +291,9 @@ fn database_delete_document() {
                 )
                 .expect("delete_document");
 
+            let document = local_db1.get_document("foo").unwrap();
+            assert!(document.is_deleted());
+
             // Check document is replicated with deleted flag
             receiver.recv_timeout(Duration::from_secs(1)).unwrap();
         },

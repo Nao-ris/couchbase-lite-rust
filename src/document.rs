@@ -324,6 +324,13 @@ impl Document {
         unsafe { CBLDocument_Sequence(self.get_ref()) }
     }
 
+    /** Returns true if a document is deleted.
+    The way it is checked is by verifying if the document's properties are empty, so avoid using
+    this function if it makes sense functionally to have no properties on a document.*/
+    pub fn is_deleted(&self) -> bool {
+        self.properties().empty()
+    }
+
     /** Returns a document's properties as a dictionary.
     This dictionary cannot be mutated; call `mutable_properties` if you want to make
     changes to the document's properties. */
