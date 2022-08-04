@@ -43,7 +43,7 @@ static CBL_LIB_FILENAME: &str = "libcblite.so";
 static DEFAULT_LIBCLANG_PATH: &str = "/usr/local/Cellar/llvm/12.0.1/lib";
 
 #[cfg(target_os = "linux")]
-static DEFAULT_LIBCLANG_PATH: &str = "/usr/lib/clang/11/lib/";
+static DEFAULT_LIBCLANG_PATH: &str = "/usr/lib/clang/10/lib/";
 
 static STATIC_LINK_CBL: bool = false;
 static CBL_SRC_DIR: &str = "../../CBL_C";
