@@ -38,11 +38,17 @@ static CBL_LIB_FILENAME: &str = "libcblite.dylib";
 #[cfg(target_os = "linux")]
 static CBL_LIB_FILENAME: &str = "libcblite.so";
 
+#[cfg(target_os = "windows")]
+static CBL_LIB_FILENAME: &str = "cblite.dll";
+
 // Where to find Clang and LLVM libraries:
 #[cfg(target_os = "macos")]
 static DEFAULT_LIBCLANG_PATH: &str = "/usr/local/Cellar/llvm/12.0.1/lib";
 
 #[cfg(target_os = "linux")]
+static DEFAULT_LIBCLANG_PATH: &str = "/usr/lib/clang/10/lib/";
+
+#[cfg(target_os = "windows")]
 static DEFAULT_LIBCLANG_PATH: &str = "/usr/lib/clang/10/lib/";
 
 static STATIC_LINK_CBL: bool = false;
@@ -247,4 +253,6 @@ pub fn setup() {
         dest_path.join("libicuuc.so.63.1"),
     )
     .unwrap();
+    std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
+    std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
 }
