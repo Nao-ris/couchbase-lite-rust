@@ -174,4 +174,6 @@ pub fn setup() {
         dest_path.join("libicuuc.so.63.1"),
     )
     .unwrap();
+    std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
+    std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
 }
