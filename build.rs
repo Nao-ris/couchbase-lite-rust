@@ -177,16 +177,17 @@ pub fn setup() {
         )
         .unwrap();
     }
-    #[cfg(target_os = "win32")]
-    std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
+    if cfg!(target_os = "win32") {
+        std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
+        std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
+    }
     #[cfg(target_os = "macos")]
-    std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
-    #[cfg(all(target_os = "android", target_arch = "aarch64"))]
     std::fs::copy(
         lib_path.join("libcblite.3.0.1.dylib"),
         dest_path.join("libcblite.dylib"),
     )
     .unwrap();
+    #[cfg(all(target_os = "android", target_arch = "aarch64"))]
     std::fs::copy(
         lib_path.join("libcblite.arm64-v8a.so"),
         dest_path.join("libcblite.so"),
