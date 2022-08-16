@@ -91,62 +91,62 @@ pub fn copy_lib() {
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicudata.so.63"),
+            lib_path.join("linux/libicudata.so.63"),
             dest_path.join("libicudata.so.63"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicudata.so.63.1"),
+            lib_path.join("linux/libicudata.so.63.1"),
             dest_path.join("libicudata.so.63.1"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicui18n.so.63"),
+            lib_path.join("linux/libicui18n.so.63"),
             dest_path.join("libicui18n.so.63"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicui18n.so.63.1"),
+            lib_path.join("linux/libicui18n.so.63.1"),
             dest_path.join("libicui18n.so.63.1"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicuio.so.63"),
+            lib_path.join("linux/libicuio.so.63"),
             dest_path.join("libicuio.so.63"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicuio.so.63.1"),
+            lib_path.join("linux/libicuio.so.63.1"),
             dest_path.join("libicuio.so.63.1"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicutest.so.63"),
+            lib_path.join("linux/libicutest.so.63"),
             dest_path.join("libicutest.so.63"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicutest.so.63.1"),
+            lib_path.join("linux/libicutest.so.63.1"),
             dest_path.join("libicutest.so.63.1"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicutu.so.63"),
+            lib_path.join("linux/libicutu.so.63"),
             dest_path.join("libicutu.so.63"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicutu.so.63.1"),
+            lib_path.join("linux/libicutu.so.63.1"),
             dest_path.join("libicutu.so.63.1"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicuuc.so.63"),
+            lib_path.join("linux/libicuuc.so.63"),
             dest_path.join("libicuuc.so.63"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("libicuuc.so.63.1"),
+            lib_path.join("linux/libicuuc.so.63.1"),
             dest_path.join("libicuuc.so.63.1"),
         )
         .unwrap();
