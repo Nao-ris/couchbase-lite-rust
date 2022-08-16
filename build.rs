@@ -91,6 +91,16 @@ pub fn copy_lib() {
         )
         .unwrap();
         std::fs::copy(
+            lib_path.join("linux/libcblite.so.3"),
+            dest_path.join("libcblite.so.3"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("linux/libcblite.so.3.0.1"),
+            dest_path.join("libcblite.so.3.0.1"),
+        )
+        .unwrap();
+        std::fs::copy(
             lib_path.join("linux/libicudata.so.63"),
             dest_path.join("libicudata.so.63"),
         )
