@@ -37,6 +37,10 @@ static CBL_LIB_FILENAME: &str = "libcblite.dylib";
 static CBL_LIB_FILENAME: &str = "libcblite.so";
 #[cfg(target_os = "win32")]
 static CBL_LIB_FILENAME: &str = "cblite.ddl";
+#[cfg(all(target_os = "android", target_arch = "aarch64"))]
+static CBL_LIB_FILENAME: &str = "libcblite.arm64-v8a.so";
+#[cfg(all(target_os = "android", target_arch = "arm"))]
+static CBL_LIB_FILENAME: &str = "libcblite.armeabi-v7a.so";
 
 fn main() {
     let bindings = bindgen::Builder::default()
@@ -176,4 +180,14 @@ pub fn setup() {
     .unwrap();
     std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
     std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
+    std::fs::copy(
+        lib_path.join("libcblite.arm64-v8a.so"),
+        dest_path.join("libcblite.so"),
+    )
+    .unwrap();
+    std::fs::copy(
+        lib_path.join("libcblite.armeabi-v7a.so"),
+        dest_path.join("libcblite.so"),
+    )
+    .unwrap();
 }
