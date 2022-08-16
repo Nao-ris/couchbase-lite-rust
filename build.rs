@@ -30,173 +30,84 @@ use std::path::PathBuf;
 static CBL_INCLUDE_DIR: &str = "libcblite-3.0.1/include";
 static CBL_LIB_DIR: &str = "libcblite-3.0.1/lib";
 
-#[cfg(target_os = "macos")]
-static CBL_LIB_FILENAME: &str = "libcblite.3.0.1.dylib";
-#[cfg(target_os = "linux")]
-static CBL_LIB_FILENAME: &str = "libcblite.so";
-#[cfg(target_os = "win32")]
-static CBL_LIB_FILENAME: &str = "cblite.ddl";
-#[cfg(all(target_os = "android", target_arch = "aarch64"))]
-static CBL_LIB_FILENAME: &str = "libcblite.arm64-v8a.so";
-#[cfg(all(target_os = "android", target_arch = "arm"))]
-static CBL_LIB_FILENAME: &str = "libcblite.armeabi-v7a.so";
-
 fn main() {
-    let bindings = bindgen::Builder::default()
-        .header("src/wrapper.h")
-        // C '#include' search paths:
-        .clang_arg(format!("-I{}", CBL_INCLUDE_DIR))
-        // Which symbols to generate bindings for:
-        .whitelist_type("CBL.*")
-        .whitelist_type("FL.*")
-        .whitelist_var("k?CBL.*")
-        .whitelist_var("k?FL.*")
-        .whitelist_function("CBL.*")
-        .whitelist_function("_?FL.*")
-        .no_copy("FLSliceResult")
-        // Tell cargo to invalidate the built crate whenever any of the
-        // included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        // Finish the builder and generate the bindings.
-        .generate()
-        // Unwrap the Result and panic on failure.
-        .expect("Unable to generate bindings");
-
-    // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_dir.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
-
-    // Tell cargo to tell rustc to link the cblite library.
-    // Link against and copy the CBL dynamic library:
-    let src = PathBuf::from(CBL_LIB_DIR).join(CBL_LIB_FILENAME);
-    println!("cargo:rerun-if-changed={}", src.to_str().unwrap());
-    // Tell rustc to link it:
-    println!("cargo:rustc-link-search={}", out_dir.to_str().unwrap());
-    println!("cargo:rustc-link-lib=dylib=cblite");
-
-    // Tell cargo to invalidate the built crate whenever the wrapper changes
-    println!("cargo:rerun-if-changed=src/wrapper.h");
-
-    println!(
-        "cargo:rustc-link-search={}/libcblite-3.0.1/lib",
-        env!("CARGO_MANIFEST_DIR")
-    );
-
-    setup();
+    generate_bindings();
+    configure_rustc();
+    copy_lib();
 }
 
-pub fn setup() {
+fn generate_bindings() {
+    let bindings = bindgen::Builder::default()
+        .header("src/wrapper.h")
+        .clang_arg(format!("-I{}", CBL_INCLUDE_DIR))
+        .allowlist_type("CBL.*")
+        .allowlist_type("FL.*")
+        .allowlist_var("k?CBL.*")
+        .allowlist_var("k?FL.*")
+        .allowlist_function("CBL.*")
+        .allowlist_function("_?FL.*")
+        .no_copy("FLSliceResult")
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .generate()
+        .expect("Unable to generate bindings");
+
+    bindings
+        .write_to_file(PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs"))
+        .expect("Couldn't write bindings!");
+}
+
+fn configure_rustc() {
+    println!("cargo:rerun-if-changed=src/wrapper.h");
+    println!("cargo:rerun-if-changed={}", CBL_INCLUDE_DIR);
+    println!("cargo:rerun-if-changed={}", CBL_LIB_DIR);
+    println!("cargo:rustc-link-search={}", env::var("OUT_DIR").unwrap());
+    println!("cargo:rustc-link-lib=dylib=cblite");
+}
+
+pub fn copy_lib() {
     let lib_path = PathBuf::from(format!(
         "{}/libcblite-3.0.1/lib/",
         env!("CARGO_MANIFEST_DIR")
     ));
-
     let dest_path = PathBuf::from(format!("{}/", std::env::var("OUT_DIR").unwrap()));
 
-    if cfg!(target_os = "linux") {
-        std::fs::copy(
-            lib_path.join("libcblite.so"),
-            dest_path.join("libcblite.so"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libcblite.so.3"),
-            dest_path.join("libcblite.so.3"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libcblite.so.3.0.1"),
-            dest_path.join("libcblite.so.3.0.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libcblite.so.sym"),
-            dest_path.join("libcblite.so.sym"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicudata.so.63"),
-            dest_path.join("libicudata.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicudata.so.63.1"),
-            dest_path.join("libicudata.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicui18n.so.63"),
-            dest_path.join("libicui18n.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicui18n.so.63.1"),
-            dest_path.join("libicui18n.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicuio.so.63"),
-            dest_path.join("libicuio.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicuio.so.63.1"),
-            dest_path.join("libicuio.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicutest.so.63"),
-            dest_path.join("libicutest.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicutest.so.63.1"),
-            dest_path.join("libicutest.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicutu.so.63"),
-            dest_path.join("libicutu.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicutu.so.63.1"),
-            dest_path.join("libicutu.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicuuc.so.63"),
-            dest_path.join("libicuuc.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libicuuc.so.63.1"),
-            dest_path.join("libicuuc.so.63.1"),
-        )
-        .unwrap();
-    }
-    if cfg!(target_os = "win32") {
-        std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
-        std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
-    }
-    #[cfg(target_os = "macos")]
-    std::fs::copy(
-        lib_path.join("libcblite.3.0.1.dylib"),
-        dest_path.join("libcblite.dylib"),
-    )
-    .unwrap();
     #[cfg(all(target_os = "android", target_arch = "aarch64"))]
     std::fs::copy(
-        lib_path.join("libcblite.arm64-v8a.so"),
+        lib_path.join("android/aarch64/libcblite.so"),
         dest_path.join("libcblite.so"),
     )
     .unwrap();
     #[cfg(all(target_os = "android", target_arch = "arm"))]
     std::fs::copy(
-        lib_path.join("libcblite.armeabi-v7a.so"),
+        lib_path.join("android/arm/libcblite.so"),
         dest_path.join("libcblite.so"),
     )
     .unwrap();
+
+    #[cfg(target_os = "linux")]
+    std::fs::copy(
+        lib_path.join("linux/libcblite.so"),
+        dest_path.join("libcblite.so"),
+    )
+    .unwrap();
+
+    #[cfg(target_os = "macos")]
+    std::fs::copy(
+        lib_path.join("macos/libcblite.dylib"),
+        dest_path.join("libcblite.dylib"),
+    )
+    .unwrap();
+
+    if cfg!(target_os = "windows") {
+        std::fs::copy(
+            lib_path.join("windows/cblite.dll"),
+            dest_path.join("cblite.dll"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("windows/cblite.lib"),
+            dest_path.join("cblite.lib"),
+        )
+        .unwrap();
+    }
 }
