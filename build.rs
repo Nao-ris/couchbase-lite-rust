@@ -189,13 +189,13 @@ pub fn setup() {
     .unwrap();
     #[cfg(all(target_os = "android", target_arch = "aarch64"))]
     std::fs::copy(
-        lib_path.join("libcblite.arm64-v8a.so"),
+        lib_path.join("libcblite.aarch64-linux-android.so"),
         dest_path.join("libcblite.so"),
     )
     .unwrap();
     #[cfg(all(target_os = "android", target_arch = "arm"))]
     std::fs::copy(
-        lib_path.join("libcblite.armeabi-v7a.so"),
+        lib_path.join("libcblite.armv7-linux-androideabi.so"),
         dest_path.join("libcblite.so"),
     )
     .unwrap();
