@@ -84,7 +84,7 @@ pub fn copy_lib() {
     )
     .unwrap();
 
-    if cfg!(target_os = "windows") {
+    if cfg!(target_os = "linux") {
         std::fs::copy(
             lib_path.join("linux/libcblite.so"),
             dest_path.join("libcblite.so"),
