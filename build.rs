@@ -84,12 +84,73 @@ pub fn copy_lib() {
     )
     .unwrap();
 
-    #[cfg(target_os = "linux")]
-    std::fs::copy(
-        lib_path.join("linux/libcblite.so"),
-        dest_path.join("libcblite.so"),
-    )
-    .unwrap();
+    if cfg!(target_os = "windows") {
+        std::fs::copy(
+            lib_path.join("linux/libcblite.so"),
+            dest_path.join("libcblite.so"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicudata.so.63"),
+            dest_path.join("libicudata.so.63"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicudata.so.63.1"),
+            dest_path.join("libicudata.so.63.1"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicui18n.so.63"),
+            dest_path.join("libicui18n.so.63"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicui18n.so.63.1"),
+            dest_path.join("libicui18n.so.63.1"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicuio.so.63"),
+            dest_path.join("libicuio.so.63"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicuio.so.63.1"),
+            dest_path.join("libicuio.so.63.1"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicutest.so.63"),
+            dest_path.join("libicutest.so.63"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicutest.so.63.1"),
+            dest_path.join("libicutest.so.63.1"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicutu.so.63"),
+            dest_path.join("libicutu.so.63"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicutu.so.63.1"),
+            dest_path.join("libicutu.so.63.1"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicuuc.so.63"),
+            dest_path.join("libicuuc.so.63"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libicuuc.so.63.1"),
+            dest_path.join("libicuuc.so.63.1"),
+        )
+        .unwrap();
+    }
 
     #[cfg(target_os = "macos")]
     std::fs::copy(
