@@ -20,7 +20,7 @@ use crate::{
     c_api::{FLSlice, FLSliceResult, _FLBuf_Release, _FLBuf_Retain, FLData_Dump},
 };
 
-use std::borrow::Cow;
+use std::{borrow::Cow, convert::TryInto};
 use std::ffi::{CStr, c_void};
 use std::fmt::{Debug, Formatter};
 use std::ptr::{self, drop_in_place};
@@ -88,21 +88,21 @@ impl<T> Debug for Slice<T> {
     }
 }
 
-pub const fn from_str(s: &str) -> Slice<&str> {
+pub fn from_str(s: &str) -> Slice<&str> {
     Slice::wrap(
         FLSlice {
             buf: s.as_ptr().cast::<c_void>(),
-            size: s.len() as u64,
+            size: s.len().try_into().unwrap(),
         },
         s,
     )
 }
 
-pub const fn from_bytes(s: &[u8]) -> Slice<&[u8]> {
+pub fn from_bytes(s: &[u8]) -> Slice<&[u8]> {
     Slice::wrap(
         FLSlice {
             buf: s.as_ptr().cast::<c_void>(),
-            size: s.len() as u64,
+            size: s.len().try_into().unwrap(),
         },
         s,
     )
