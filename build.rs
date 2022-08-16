@@ -73,13 +73,13 @@ pub fn copy_lib() {
 
     #[cfg(all(target_os = "android", target_arch = "aarch64"))]
     std::fs::copy(
-        lib_path.join("android/aarch64/libcblite.so"),
+        lib_path.join("android/aarch64/libcblite.stripped.so"),
         dest_path.join("libcblite.so"),
     )
     .unwrap();
     #[cfg(all(target_os = "android", target_arch = "arm"))]
     std::fs::copy(
-        lib_path.join("android/arm/libcblite.so"),
+        lib_path.join("android/arm/libcblite.stripped.so"),
         dest_path.join("libcblite.so"),
     )
     .unwrap();
