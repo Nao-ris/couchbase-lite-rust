@@ -25,14 +25,13 @@
 extern crate bindgen;
 
 use std::env;
-use std::fs;
 use std::path::PathBuf;
 
 static CBL_INCLUDE_DIR: &str = "libcblite-3.0.1/include";
 static CBL_LIB_DIR: &str = "libcblite-3.0.1/lib";
 
 #[cfg(target_os = "macos")]
-static CBL_LIB_FILENAME: &str = "libcblite.dylib";
+static CBL_LIB_FILENAME: &str = "libcblite.3.0.1.dylib";
 #[cfg(target_os = "linux")]
 static CBL_LIB_FILENAME: &str = "libcblite.so";
 #[cfg(target_os = "win32")]
@@ -72,9 +71,7 @@ fn main() {
     // Tell cargo to tell rustc to link the cblite library.
     // Link against and copy the CBL dynamic library:
     let src = PathBuf::from(CBL_LIB_DIR).join(CBL_LIB_FILENAME);
-    let dst = out_dir.join(CBL_LIB_FILENAME);
     println!("cargo:rerun-if-changed={}", src.to_str().unwrap());
-    fs::copy(src, dst).expect("copy dylib");
     // Tell rustc to link it:
     println!("cargo:rustc-link-search={}", out_dir.to_str().unwrap());
     println!("cargo:rustc-link-lib=dylib=cblite");
@@ -180,6 +177,11 @@ pub fn setup() {
     .unwrap();
     std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
     std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
+    std::fs::copy(
+        lib_path.join("libcblite.3.0.1.dylib"),
+        dest_path.join("libcblite.dylib"),
+    )
+    .unwrap();
     std::fs::copy(
         lib_path.join("libcblite.arm64-v8a.so"),
         dest_path.join("libcblite.so"),
