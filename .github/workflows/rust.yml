@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Install apt-get
-      run: sudo apt-get install -y clang llvm
+      run: sudo apt-get install -y clang llvm libicu66
     - name: Install latest nightly
       uses: actions-rs/toolchain@v1
       with:
