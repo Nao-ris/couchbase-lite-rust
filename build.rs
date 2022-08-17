@@ -82,7 +82,7 @@ pub fn copy_lib() {
     match std::env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
         "android" => {
             std::fs::copy(
-                lib_path.join("libcblite.so"),
+                lib_path.join("libcblite.stripped.so"),
                 dest_path.join("libcblite.so"),
             )
             .unwrap();
