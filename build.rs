@@ -60,17 +60,34 @@ fn configure_rustc() {
     println!("cargo:rerun-if-changed=src/wrapper.h");
     println!("cargo:rerun-if-changed={}", CBL_INCLUDE_DIR);
     println!("cargo:rerun-if-changed={}", CBL_LIB_DIR);
+    println!(
+        "cargo:rustc-link-search={}/{}/{}",
+        env!("CARGO_MANIFEST_DIR"),
+        CBL_LIB_DIR,
+        std::env::var("TARGET").unwrap()
+    );
     println!("cargo:rustc-link-search={}", env::var("OUT_DIR").unwrap());
     println!("cargo:rustc-link-lib=dylib=cblite");
 }
 
 pub fn copy_lib() {
     let lib_path = PathBuf::from(format!(
-        "{}/libcblite-3.0.1/lib/",
-        env!("CARGO_MANIFEST_DIR")
+        "{}/{}/{}/",
+        env!("CARGO_MANIFEST_DIR"),
+        CBL_LIB_DIR,
+        std::env::var("TARGET").unwrap()
     ));
     let dest_path = PathBuf::from(format!("{}/", std::env::var("OUT_DIR").unwrap()));
 
+    if cfg!(target_os = "linux") || cfg!(target_os = "android") {
+        std::fs::copy(
+            lib_path.join("libcblite.so"),
+            dest_path.join("libcblite.so"),
+        )
+        .unwrap();
+    }
+
+    /*
     #[cfg(all(target_os = "android", target_arch = "aarch64"))]
     std::fs::copy(
         lib_path.join("android/aarch64/libcblite.stripped.so"),
@@ -165,25 +182,18 @@ pub fn copy_lib() {
             dest_path.join("libicuuc.so.63.1"),
         )
         .unwrap();
+    }*/
+
+    if cfg!(target_os = "macos") {
+        std::fs::copy(
+            lib_path.join("libcblite.dylib"),
+            dest_path.join("libcblite.dylib"),
+        )
+        .unwrap();
     }
 
-    #[cfg(target_os = "macos")]
-    std::fs::copy(
-        lib_path.join("macos/libcblite.dylib"),
-        dest_path.join("libcblite.dylib"),
-    )
-    .unwrap();
-
     if cfg!(target_os = "windows") {
-        std::fs::copy(
-            lib_path.join("windows/cblite.dll"),
-            dest_path.join("cblite.dll"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("windows/cblite.lib"),
-            dest_path.join("cblite.lib"),
-        )
-        .unwrap();
+        std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
+        std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
     }
 }
