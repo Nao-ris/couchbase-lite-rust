@@ -27,8 +27,8 @@ extern crate bindgen;
 use std::env;
 use std::path::PathBuf;
 
-static CBL_INCLUDE_DIR: &str = "libcblite-3.0.1/include";
-static CBL_LIB_DIR: &str = "libcblite-3.0.1/lib";
+static CBL_INCLUDE_DIR: &str = "libcblite-3.0.2/include";
+static CBL_LIB_DIR: &str = "libcblite-3.0.2/lib";
 
 fn main() {
     generate_bindings();
@@ -79,7 +79,7 @@ pub fn copy_lib() {
     ));
     let dest_path = PathBuf::from(format!("{}/", std::env::var("OUT_DIR").unwrap()));
 
-    if cfg!(target_os = "linux") || cfg!(target_os = "android") {
+    if cfg!(target_os = "android") {
         std::fs::copy(
             lib_path.join("libcblite.so"),
             dest_path.join("libcblite.so"),
@@ -87,107 +87,38 @@ pub fn copy_lib() {
         .unwrap();
     }
 
-    /*
-    #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-    std::fs::copy(
-        lib_path.join("android/aarch64/libcblite.stripped.so"),
-        dest_path.join("libcblite.so"),
-    )
-    .unwrap();
-    #[cfg(all(target_os = "android", target_arch = "arm"))]
-    std::fs::copy(
-        lib_path.join("android/arm/libcblite.stripped.so"),
-        dest_path.join("libcblite.so"),
-    )
-    .unwrap();
-
     if cfg!(target_os = "linux") {
         std::fs::copy(
-            lib_path.join("linux/libcblite.so"),
+            lib_path.join("libcblite.so"),
             dest_path.join("libcblite.so"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("linux/libcblite.so.3"),
+            lib_path.join("libcblite.so.3"),
             dest_path.join("libcblite.so.3"),
         )
         .unwrap();
         std::fs::copy(
-            lib_path.join("linux/libcblite.so.3.0.1"),
-            dest_path.join("libcblite.so.3.0.1"),
+            lib_path.join("libcblite.so.3.0.2"),
+            dest_path.join("libcblite.so.3.0.2"),
         )
         .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libcblite.so.sym"),
-            dest_path.join("libcblite.so.sym"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicudata.so.63"),
-            dest_path.join("libicudata.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicudata.so.63.1"),
-            dest_path.join("libicudata.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicui18n.so.63"),
-            dest_path.join("libicui18n.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicui18n.so.63.1"),
-            dest_path.join("libicui18n.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicuio.so.63"),
-            dest_path.join("libicuio.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicuio.so.63.1"),
-            dest_path.join("libicuio.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicutest.so.63"),
-            dest_path.join("libicutest.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicutest.so.63.1"),
-            dest_path.join("libicutest.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicutu.so.63"),
-            dest_path.join("libicutu.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicutu.so.63.1"),
-            dest_path.join("libicutu.so.63.1"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicuuc.so.63"),
-            dest_path.join("libicuuc.so.63"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("linux/libicuuc.so.63.1"),
-            dest_path.join("libicuuc.so.63.1"),
-        )
-        .unwrap();
-    }*/
+    }
 
     if cfg!(target_os = "macos") {
         std::fs::copy(
             lib_path.join("libcblite.dylib"),
             dest_path.join("libcblite.dylib"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libcblite.3.dylib"),
+            dest_path.join("libcblite.3.dylib"),
+        )
+        .unwrap();
+        std::fs::copy(
+            lib_path.join("libcblite.3.0.2.dylib"),
+            dest_path.join("libcblite.3.0.2.dylib"),
         )
         .unwrap();
     }
