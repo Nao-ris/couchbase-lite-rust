@@ -67,7 +67,12 @@ fn configure_rustc() {
         std::env::var("TARGET").unwrap()
     );
     println!("cargo:rustc-link-search={}", env::var("OUT_DIR").unwrap());
-    println!("cargo:rustc-link-lib=dylib=cblite");
+
+    if std::env::var("CARGO_CFG_TARGET_OS").unwrap() != "ios" {
+        println!("cargo:rustc-link-lib=dylib=cblite");
+    } else {
+        println!("cargo:rustc-link-lib=framework=CouchbaseLite");
+    }
 }
 
 pub fn copy_lib() {
@@ -86,6 +91,9 @@ pub fn copy_lib() {
                 dest_path.join("libcblite.so"),
             )
             .unwrap();
+        }
+        "ios" => {
+            // Nothing to copy there
         }
         "linux" => {
             std::fs::copy(
