@@ -79,52 +79,57 @@ pub fn copy_lib() {
     ));
     let dest_path = PathBuf::from(format!("{}/", std::env::var("OUT_DIR").unwrap()));
 
-    if cfg!(target_os = "android") {
-        std::fs::copy(
-            lib_path.join("libcblite.so"),
-            dest_path.join("libcblite.so"),
-        )
-        .unwrap();
-    }
-
-    if cfg!(target_os = "linux") {
-        std::fs::copy(
-            lib_path.join("libcblite.so"),
-            dest_path.join("libcblite.so"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libcblite.so.3"),
-            dest_path.join("libcblite.so.3"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libcblite.so.3.0.2"),
-            dest_path.join("libcblite.so.3.0.2"),
-        )
-        .unwrap();
-    }
-
-    if cfg!(target_os = "macos") {
-        std::fs::copy(
-            lib_path.join("libcblite.dylib"),
-            dest_path.join("libcblite.dylib"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libcblite.3.dylib"),
-            dest_path.join("libcblite.3.dylib"),
-        )
-        .unwrap();
-        std::fs::copy(
-            lib_path.join("libcblite.3.0.2.dylib"),
-            dest_path.join("libcblite.3.0.2.dylib"),
-        )
-        .unwrap();
-    }
-
-    if cfg!(target_os = "windows") {
-        std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
-        std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
+    match std::env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+        "android" => {
+            std::fs::copy(
+                lib_path.join("libcblite.so"),
+                dest_path.join("libcblite.so"),
+            )
+            .unwrap();
+        }
+        "linux" => {
+            std::fs::copy(
+                lib_path.join("libcblite.so"),
+                dest_path.join("libcblite.so"),
+            )
+            .unwrap();
+            std::fs::copy(
+                lib_path.join("libcblite.so.3"),
+                dest_path.join("libcblite.so.3"),
+            )
+            .unwrap();
+            std::fs::copy(
+                lib_path.join("libcblite.so.3.0.2"),
+                dest_path.join("libcblite.so.3.0.2"),
+            )
+            .unwrap();
+        }
+        "macos" => {
+            std::fs::copy(
+                lib_path.join("libcblite.dylib"),
+                dest_path.join("libcblite.dylib"),
+            )
+            .unwrap();
+            std::fs::copy(
+                lib_path.join("libcblite.3.dylib"),
+                dest_path.join("libcblite.3.dylib"),
+            )
+            .unwrap();
+            std::fs::copy(
+                lib_path.join("libcblite.3.0.2.dylib"),
+                dest_path.join("libcblite.3.0.2.dylib"),
+            )
+            .unwrap();
+        }
+        "windows" => {
+            std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
+            std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
+        }
+        _ => {
+            panic!(
+                "Unsupported target: {}",
+                std::env::var("CARGO_CFG_TARGET_OS").unwrap()
+            );
+        }
     }
 }
