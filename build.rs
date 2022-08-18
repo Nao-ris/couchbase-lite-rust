@@ -26,20 +26,21 @@ extern crate bindgen;
 
 use std::error::Error;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 
 static CBL_INCLUDE_DIR: &str = "libcblite-3.0.2/include";
 static CBL_LIB_DIR: &str = "libcblite-3.0.2/lib";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    generate_bindings();
-    configure_rustc();
+    generate_bindings()?;
+    configure_rustc()?;
     copy_lib()?;
 
     Ok(())
 }
 
-fn generate_bindings() {
+fn generate_bindings() -> Result<(), Box<dyn Error>> {
     let bindings = bindgen::Builder::default()
         .header("src/wrapper.h")
         .clang_arg(format!("-I{}", CBL_INCLUDE_DIR))
@@ -54,28 +55,35 @@ fn generate_bindings() {
         .generate()
         .expect("Unable to generate bindings");
 
+    let out_dir = env::var("OUT_DIR")?;
     bindings
-        .write_to_file(PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs"))
+        .write_to_file(PathBuf::from(out_dir).join("bindings.rs"))
         .expect("Couldn't write bindings!");
+
+    Ok(())
 }
 
-fn configure_rustc() {
+fn configure_rustc() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/wrapper.h");
     println!("cargo:rerun-if-changed={}", CBL_INCLUDE_DIR);
     println!("cargo:rerun-if-changed={}", CBL_LIB_DIR);
+    let target_dir = env::var("TARGET")?;
     println!(
         "cargo:rustc-link-search={}/{}/{}",
         env!("CARGO_MANIFEST_DIR"),
         CBL_LIB_DIR,
-        std::env::var("TARGET").unwrap()
+        target_dir
     );
     println!("cargo:rustc-link-search={}", env::var("OUT_DIR").unwrap());
 
-    if std::env::var("CARGO_CFG_TARGET_OS").unwrap() != "ios" {
+    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    if target_os != "ios" {
         println!("cargo:rustc-link-lib=dylib=cblite");
     } else {
         println!("cargo:rustc-link-lib=framework=CouchbaseLite");
     }
+
+    Ok(())
 }
 
 pub fn copy_lib() -> Result<(), Box<dyn Error>> {
@@ -83,13 +91,13 @@ pub fn copy_lib() -> Result<(), Box<dyn Error>> {
         "{}/{}/{}/",
         env!("CARGO_MANIFEST_DIR"),
         CBL_LIB_DIR,
-        std::env::var("TARGET").unwrap()
+        env::var("TARGET").unwrap()
     ));
-    let dest_path = PathBuf::from(format!("{}/", std::env::var("OUT_DIR").unwrap()));
+    let dest_path = PathBuf::from(format!("{}/", env::var("OUT_DIR").unwrap()));
 
-    match std::env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+    match env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
         "android" => {
-            std::fs::copy(
+            fs::copy(
                 lib_path.join("libcblite.stripped.so"),
                 dest_path.join("libcblite.so"),
             )?;
@@ -98,42 +106,39 @@ pub fn copy_lib() -> Result<(), Box<dyn Error>> {
             // Nothing to copy there
         }
         "linux" => {
-            std::fs::copy(
+            fs::copy(
                 lib_path.join("libcblite.so"),
                 dest_path.join("libcblite.so"),
             )?;
-            std::fs::copy(
+            fs::copy(
                 lib_path.join("libcblite.so.3"),
                 dest_path.join("libcblite.so.3"),
             )?;
-            std::fs::copy(
+            fs::copy(
                 lib_path.join("libcblite.so.3.0.2"),
                 dest_path.join("libcblite.so.3.0.2"),
             )?;
         }
         "macos" => {
-            std::fs::copy(
+            fs::copy(
                 lib_path.join("libcblite.dylib"),
                 dest_path.join("libcblite.dylib"),
             )?;
-            std::fs::copy(
+            fs::copy(
                 lib_path.join("libcblite.3.dylib"),
                 dest_path.join("libcblite.3.dylib"),
             )?;
-            std::fs::copy(
+            fs::copy(
                 lib_path.join("libcblite.3.0.2.dylib"),
                 dest_path.join("libcblite.3.0.2.dylib"),
             )?;
         }
         "windows" => {
-            std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
-            std::fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib")).unwrap();
+            fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll"))?;
+            fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib"))?;
         }
         _ => {
-            panic!(
-                "Unsupported target: {}",
-                std::env::var("CARGO_CFG_TARGET_OS").unwrap()
-            );
+            panic!("Unsupported target: {}", env::var("CARGO_CFG_TARGET_OS")?);
         }
     }
 
