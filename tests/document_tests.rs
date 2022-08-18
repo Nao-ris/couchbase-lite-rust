@@ -327,7 +327,7 @@ fn document_revision_limit() {
         assert!(!document.is_deleted()); // not deleted
         assert!(document.revision_id().unwrap().starts_with("19999")); // revision 19 999
 
-        // Prior documents all found in DB
+        // Only one document found in DB
         let query =
             Query::new(db, QueryLanguage::N1QL, "select _.* from _ ").expect("create query");
         let mut results = query.execute().expect("execute");
@@ -340,6 +340,6 @@ fn document_revision_limit() {
                 break;
             }
         }
-        assert_eq!(documents_count, 1); // 10 000 documents remainings, all revisions kept
+        assert_eq!(documents_count, 1);
     });
 }
