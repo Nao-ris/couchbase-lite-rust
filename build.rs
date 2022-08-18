@@ -110,15 +110,26 @@ pub fn copy_lib() -> Result<(), Box<dyn Error>> {
                 lib_path.join("libcblite.so.3"),
                 dest_path.join("libcblite.so.3"),
             )?;
+            // Needed only for build, not required for run
+            fs::copy(
+                lib_path.join("libcblite.so.3"),
+                dest_path.join("libcblite.so"),
+            )?;
         }
         "macos" => {
             fs::copy(
                 lib_path.join("libcblite.3.dylib"),
                 dest_path.join("libcblite.3.dylib"),
             )?;
+            // Needed only for build, not required for run
+            fs::copy(
+                lib_path.join("libcblite.3.dylib"),
+                dest_path.join("libcblite.dylib"),
+            )?;
         }
         "windows" => {
             fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll"))?;
+            // Needed only for build, not required for run
             fs::copy(lib_path.join("cblite.lib"), dest_path.join("cblite.lib"))?;
         }
         _ => {
