@@ -64,56 +64,6 @@ fn query() {
 }
 
 #[test]
-fn array_contains_buggy() {
-    utils::with_db(|db| {
-        let mut doc = Document::new();
-        doc.set_properties_as_json("{\"id\":\"array_doc\",\"array\":[\"id1\",\"id2\",\"id3\"]}")
-            .unwrap();
-        db.save_document(&mut doc).expect("save");
-
-        let mut doc = Document::new();
-        doc.set_properties_as_json("{\"id\":\"id2\"}").unwrap();
-        db.save_document(&mut doc).expect("save");
-
-        // First query, should return 'array_doc'
-        let query = Query::new(
-            db,
-            QueryLanguage::N1QL,
-            "select r.id \
-                from _ r \
-                join _ f ON \
-                ARRAY_CONTAINS(r.array, f.id)",
-        )
-        .expect("create query");
-
-        let mut results = query.execute().expect("execute");
-        // CBL Query: {Query#3} Compiling N1QL query: select r.id from _ r join _ f ON ARRAY_CONTAINS(r.array, f.id)
-        // CBL Query: {Query#3} Compiled as SELECT fl_result(fl_value(r.body, 'id')) FROM kv_default AS r INNER JOIN kv_default AS f ON (array_contains(fl_value(r.body, 'array'), fl_value(f.body, 'id'))) AND (f.flags & 1 = 0) WHERE (r.flags & 1 = 0)
-
-        let row = results.next().unwrap();
-        assert_eq!(row.get(0).as_string().unwrap(), "array_doc");
-        assert!(results.next().is_none());
-
-        // First query, should also return 'array_doc' but is not returning anything because of the alias
-        let query = Query::new(
-            db,
-            QueryLanguage::N1QL,
-            "select r.id as id \
-                from _ r \
-                join _ f ON \
-                ARRAY_CONTAINS(r.array, f.id)",
-        )
-        .expect("create query");
-
-        let mut results = query.execute().expect("execute");
-        // CBL Query: {Query#5} Compiling N1QL query: select r.id as id from _ r join _ f ON ARRAY_CONTAINS(r.array, f.id)
-        // CBL Query: {Query#5} Compiled as SELECT fl_result(fl_value(r.body, 'id')) AS id FROM kv_default AS r INNER JOIN kv_default AS f ON (array_contains(fl_value(r.body, 'array'), id)) AND (f.flags & 1 = 0) WHERE (r.flags & 1 = 0)
-
-        assert!(results.next().is_none());
-    });
-}
-
-#[test]
 fn indexes() {
     utils::with_db(|db| {
         assert!(db
