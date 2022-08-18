@@ -307,3 +307,39 @@ fn database_document_expiration() {
         assert_eq!(expiration.unwrap().0, 1000000000);
     });
 }
+
+#[test]
+fn document_revision_limit() {
+    utils::with_db(|db| {
+        for n in 0..10000 {
+            let document = db.get_document("foo");
+            if let Ok(document) = document {
+                db.delete_document(&document).expect("delete_document");
+            }
+
+            let mut document = Document::new_with_id("foo");
+            document.mutable_properties().at("index").put_i64(n);
+            db.save_document(&mut document).expect("save_document");
+        }
+
+        // Document found in DB
+        let document = db.get_document("foo").unwrap();
+        assert!(!document.is_deleted()); // not deleted
+        assert!(document.revision_id().unwrap().starts_with("19999")); // revision 19 999
+
+        // Prior documents all found in DB
+        let query =
+            Query::new(db, QueryLanguage::N1QL, "select _.* from _ ").expect("create query");
+        let mut results = query.execute().expect("execute");
+
+        let mut documents_count = 0;
+        loop {
+            if let Some(_) = results.next() {
+                documents_count = documents_count + 1;
+            } else {
+                break;
+            }
+        }
+        assert_eq!(documents_count, 1); // 10 000 documents remainings, all revisions kept
+    });
+}
