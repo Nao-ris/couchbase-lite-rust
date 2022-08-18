@@ -16,7 +16,8 @@
 //
 
 use crate::{
-    Array, CblRef, Database, Dict, MutableDict, Result, Value, failure, release, retain,
+    Array, CblRef, CouchbaseLiteError, Database, Dict, Error, MutableDict, Result, Value, failure,
+    release, retain,
     slice::from_str,
     c_api::{
         CBLDatabase_CreateQuery, CBLError, CBLQuery, CBLQueryLanguage, CBLQuery_ColumnCount,
@@ -26,9 +27,10 @@ use crate::{
         CBLResultSet_ValueForKey, CBLListenerToken, CBLQuery_AddChangeListener,
         CBLQuery_CopyCurrentResults,
     },
+    Listener,
 };
 
-use std::os::raw::c_uint;
+use std::{os::raw::c_uint};
 use ListenerToken;
 
 /** Query languages. */
@@ -45,11 +47,11 @@ unsafe extern "C" fn c_query_change_listener(
     query: *mut CBLQuery,
     token: *mut CBLListenerToken,
 ) {
-    let callback: Box<ChangeListener> = Box::from_raw(context as *mut _);
-    let query = Query::wrap(query as *mut CBLQuery);
+    let callback = context as *const ChangeListener;
+    let query = Query::wrap(query.cast::<CBLQuery>());
     let token = ListenerToken::new(token);
 
-    callback(&query, &token);
+    (*callback)(&query, &token);
 }
 
 /** A compiled database query. */
@@ -122,8 +124,12 @@ impl Query {
     strategy. You can use this to help optimize the query: the word `SCAN` in the strategy
     indicates a linear scan of the entire database, which should be avoided by adding an index.
     The strategy will also show which index(es), if any, are used. */
-    pub fn explain(&self) -> String {
-        unsafe { CBLQuery_Explain(self.get_ref()).to_string().unwrap() }
+    pub fn explain(&self) -> Result<String> {
+        unsafe {
+            CBLQuery_Explain(self.get_ref())
+                .to_string()
+                .ok_or(Error::cbl_error(CouchbaseLiteError::InvalidQuery))
+        }
     }
 
     /** Runs the query, returning the results as a `ResultSet` object, which is an iterator
@@ -167,16 +173,27 @@ impl Query {
 
     When the first change listener is added, the query will run (in the background) and notify
     the listener(s) of the results when ready. After that, it will run in the background after
-    the database changes, and only notify the listeners when the result set changes. */
-    pub fn add_listener(&mut self, listener: ChangeListener) -> ListenerToken {
-        unsafe {
-            let callback: Box<ChangeListener> = Box::new(Box::new(listener));
+    the database changes, and only notify the listeners when the result set changes.
 
-            ListenerToken::new(CBLQuery_AddChangeListener(
-                self.get_ref(),
-                Some(c_query_change_listener),
-                Box::into_raw(callback) as *mut _,
-            ))
+    # Lifetime
+
+    The listener is deleted at the end of life of the `Listener` object.
+    You must keep the `Listener` object as long as you need it.
+    */
+    #[must_use]
+    pub fn add_listener(&mut self, listener: ChangeListener) -> Listener<ChangeListener> {
+        unsafe {
+            let listener = Box::new(listener);
+            let ptr = Box::into_raw(listener);
+
+            Listener::new(
+                ListenerToken::new(CBLQuery_AddChangeListener(
+                    self.get_ref(),
+                    Some(c_query_change_listener),
+                    ptr.cast(),
+                )),
+                Box::from_raw(ptr),
+            )
         }
     }
 

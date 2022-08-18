@@ -90,7 +90,7 @@ impl Fleece {
         unsafe { Value::wrap(FLDoc_GetRoot(self.get_ref()), self) }
     }
 
-    pub fn as_shared_key(&self) {
+    pub fn as_shared_key() {
         todo!("To be implemented when needed")
     }
 
@@ -188,7 +188,7 @@ impl CblRef for Value {
 }
 
 impl Value {
-    pub const UNDEFINED: Value = Value {
+    pub const UNDEFINED: Self = Self {
         cbl_ref: ptr::null(),
     };
 

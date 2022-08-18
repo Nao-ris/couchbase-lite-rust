@@ -30,8 +30,8 @@ use crate::{
         kCBLEncryptionNone, kCBLMaintenanceTypeFullOptimize, kCBLMaintenanceTypeIntegrityCheck,
         kCBLMaintenanceTypeOptimize, kCBLMaintenanceTypeReindex,
     },
+    Listener,
 };
-
 use std::path::{Path, PathBuf};
 use std::ptr;
 
@@ -41,19 +41,19 @@ pub struct EncryptionKey {
 }
 
 impl EncryptionKey {
-    pub fn new_from_password(password: String) -> Option<Self> {
+    pub fn new_from_password(password: &str) -> Option<Self> {
         unsafe {
             let key = CBLEncryptionKey {
                 algorithm: kCBLEncryptionNone,
                 bytes: [0; 32],
             };
-            let encryption_key = EncryptionKey {
+            let encryption_key = Self {
                 cbl_ref: Box::new(key),
             };
 
             if CBLEncryptionKey_FromPassword(
                 encryption_key.get_ref() as *mut CBLEncryptionKey,
-                from_str(password.as_str()).get_ref(),
+                from_str(password).get_ref(),
             ) {
                 Some(encryption_key)
             } else {
@@ -66,7 +66,7 @@ impl EncryptionKey {
 impl CblRef for EncryptionKey {
     type Output = *const CBLEncryptionKey;
     fn get_ref(&self) -> Self::Output {
-        &*self.cbl_ref as *const CBLEncryptionKey
+        std::ptr::addr_of!(*self.cbl_ref)
     }
 }
 
@@ -98,7 +98,7 @@ unsafe extern "C" fn c_database_change_listener(
     num_docs: ::std::os::raw::c_uint,
     c_doc_ids: *mut FLString,
 ) {
-    let callback: Box<ChangeListener> = Box::from_raw(context as *mut _);
+    let callback = context as *const ChangeListener;
     let database = Database::retain(db as *mut CBLDatabase);
 
     let doc_ids = std::slice::from_raw_parts(c_doc_ids, num_docs as usize)
@@ -106,7 +106,7 @@ unsafe extern "C" fn c_database_change_listener(
         .filter_map(|doc_id| doc_id.to_string())
         .collect();
 
-    callback(&database, doc_ids);
+    (*callback)(&database, doc_ids);
 }
 
 /** Callback indicating that the database (or an object belonging to it) is ready to call one or more listeners. */
@@ -253,7 +253,7 @@ impl Database {
     }
 
     /** Encrypts or decrypts a database, or changes its encryption key. */
-    pub fn change_encryption_key(&mut self, encryption_key: EncryptionKey) -> Result<()> {
+    pub fn change_encryption_key(&mut self, encryption_key: &EncryptionKey) -> Result<()> {
         unsafe {
             check_bool(|error| {
                 CBLDatabase_ChangeEncryptionKey(self.get_ref(), encryption_key.get_ref(), error)
@@ -281,19 +281,30 @@ impl Database {
     //////// NOTIFICATIONS:
 
     /** Registers a database change listener function. It will be called after one or more
-    documents are changed on disk. Remember to keep the reference to the ChangeListener
-    if you want the callback to keep working. */
-    pub fn add_listener(&mut self, listener: ChangeListener) -> ListenerToken {
-        unsafe {
-            let callback: Box<ChangeListener> = Box::new(Box::new(listener));
+        documents are changed on disk. Remember to keep the reference to the ChangeListener
+        if you want the callback to keep working.
 
-            ListenerToken {
-                cbl_ref: CBLDatabase_AddChangeListener(
-                    self.cbl_ref,
-                    Some(c_database_change_listener),
-                    Box::into_raw(callback) as *mut _,
-                ),
-            }
+        # Lifetime
+
+        The listener is deleted at the end of life of the `Listener` object.
+        You must keep the `Listener` object as long as you need it.
+    */
+    #[must_use]
+    pub fn add_listener(&mut self, listener: ChangeListener) -> Listener<ChangeListener> {
+        unsafe {
+            let listener = Box::new(listener);
+            let ptr = Box::into_raw(listener);
+
+            Listener::new(
+                ListenerToken {
+                    cbl_ref: CBLDatabase_AddChangeListener(
+                        self.cbl_ref,
+                        Some(c_database_change_listener),
+                        ptr.cast(),
+                    ),
+                },
+                Box::from_raw(ptr),
+            )
         }
     }
 

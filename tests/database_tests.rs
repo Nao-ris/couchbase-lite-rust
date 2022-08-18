@@ -80,7 +80,7 @@ fn db_encryption_key() {
         directory: tmp_dir.path(),
         encryption_key: None,
     };
-    let encryption_key = EncryptionKey::new_from_password("password1".to_string()).unwrap();
+    let encryption_key = EncryptionKey::new_from_password("password1").unwrap();
     let cfg_encryption1 = DatabaseConfiguration {
         directory: tmp_dir.path(),
         encryption_key: Some(encryption_key.clone()),
@@ -101,7 +101,7 @@ fn db_encryption_key() {
     {
         let mut db = Database::open(utils::DB_NAME, Some(cfg_no_encryption.clone())).unwrap();
         assert!(db.get_document("foo").is_ok());
-        assert!(db.change_encryption_key(encryption_key).is_ok());
+        assert!(db.change_encryption_key(&encryption_key).is_ok());
     }
 
     // Assert database can only be opened with ecryption & doc can be retrieved
