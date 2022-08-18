@@ -97,35 +97,15 @@ pub fn copy_lib() {
         }
         "linux" => {
             std::fs::copy(
-                lib_path.join("libcblite.so"),
-                dest_path.join("libcblite.so"),
-            )
-            .unwrap();
-            std::fs::copy(
                 lib_path.join("libcblite.so.3"),
                 dest_path.join("libcblite.so.3"),
-            )
-            .unwrap();
-            std::fs::copy(
-                lib_path.join("libcblite.so.3.0.2"),
-                dest_path.join("libcblite.so.3.0.2"),
             )
             .unwrap();
         }
         "macos" => {
             std::fs::copy(
-                lib_path.join("libcblite.dylib"),
-                dest_path.join("libcblite.dylib"),
-            )
-            .unwrap();
-            std::fs::copy(
                 lib_path.join("libcblite.3.dylib"),
                 dest_path.join("libcblite.3.dylib"),
-            )
-            .unwrap();
-            std::fs::copy(
-                lib_path.join("libcblite.3.0.2.dylib"),
-                dest_path.join("libcblite.3.0.2.dylib"),
             )
             .unwrap();
         }
