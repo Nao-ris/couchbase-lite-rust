@@ -49,8 +49,8 @@ pub mod slice;
 mod c_api;
 
 use self::c_api::{
-    CBLListenerToken, CBLListener_Remove, CBLRefCounted, CBL_DumpInstances, CBL_InstanceCount,
-    CBL_Release, CBL_Retain,
+    CBLListenerToken, CBLRefCounted, CBL_DumpInstances, CBL_InstanceCount, CBL_Release, CBL_Retain,
+    CBLListener_Remove,
 };
 
 //////// RE-EXPORT:
@@ -74,6 +74,20 @@ pub trait CblRef {
 #[derive(Debug, Clone, Copy)]
 /// A time value for document expiration. Defined as milliseconds since the Unix epoch (1/1/1970.)
 pub struct Timestamp(pub i64);
+
+pub struct Listener<T> {
+    pub listener_token: ListenerToken,
+    pub listener: T,
+}
+
+impl<T> Listener<T> {
+    pub fn new(listener_token: ListenerToken, listener: T) -> Self {
+        Self {
+            listener_token,
+            listener,
+        }
+    }
+}
 
 /// An opaque token representing a registered listener.
 /// When this object is dropped, the listener function will not be called again.

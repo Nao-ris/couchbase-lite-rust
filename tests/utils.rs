@@ -76,12 +76,7 @@ where
 pub struct ReplicationTestConfiguration {
     pub replicator_type: ReplicatorType,
     pub continuous: bool,
-    pub document_ids: Array,
-    pub push_filter: Option<ReplicationFilter>,
-    pub pull_filter: Option<ReplicationFilter>,
-    pub conflict_resolver: Option<ConflictResolver>,
-    pub property_encryptor: Option<PropertyEncryptor>,
-    pub property_decryptor: Option<PropertyDecryptor>,
+    pub document_ids: MutableArray,
 }
 
 impl Default for ReplicationTestConfiguration {
@@ -89,12 +84,7 @@ impl Default for ReplicationTestConfiguration {
         Self {
             replicator_type: ReplicatorType::PushAndPull,
             continuous: true,
-            document_ids: Array::default(),
-            push_filter: None,
-            pull_filter: None,
-            conflict_resolver: None,
-            property_encryptor: None,
-            property_decryptor: None,
+            document_ids: MutableArray::default(),
         }
     }
 }
@@ -118,19 +108,16 @@ fn generate_replication_configuration(
         headers: HashMap::new(),
         pinned_server_certificate: None,
         trusted_root_certificates: None,
-        channels: Array::default(),
+        channels: MutableArray::default(),
         document_ids: config.document_ids,
-        push_filter: config.push_filter,
-        pull_filter: config.pull_filter,
-        conflict_resolver: config.conflict_resolver,
-        property_encryptor: config.property_encryptor,
-        property_decryptor: config.property_decryptor,
     }
 }
 
 pub fn with_three_dbs<F>(
     config1: ReplicationTestConfiguration,
     config2: ReplicationTestConfiguration,
+    context1: Box<ReplicationConfigurationContext>,
+    context2: Box<ReplicationConfigurationContext>,
     f: F,
 ) where
     F: Fn(&mut Database, &mut Database, &mut Database, &mut Replicator, &mut Replicator),
@@ -160,10 +147,10 @@ pub fn with_three_dbs<F>(
 
     // Create replicators
     let config1 = generate_replication_configuration(&local_db1, &central_db, config1);
-    let mut repl1 = Replicator::new(config1).unwrap();
+    let mut repl1 = Replicator::new(config1, context1).unwrap();
 
     let config2 = generate_replication_configuration(&local_db2, &central_db, config2);
-    let mut repl2 = Replicator::new(config2).unwrap();
+    let mut repl2 = Replicator::new(config2, context2).unwrap();
 
     // Start replicators
     repl1.start(false);
@@ -179,8 +166,8 @@ pub fn with_three_dbs<F>(
     );
 
     // Clean up
-    repl1.stop();
-    repl2.stop();
+    assert!(repl1.stop());
+    assert!(repl2.stop());
 
     local_db1.delete().unwrap();
     local_db2.delete().unwrap();

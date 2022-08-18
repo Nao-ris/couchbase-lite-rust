@@ -24,16 +24,19 @@
 
 extern crate bindgen;
 
+use std::error::Error;
 use std::env;
 use std::path::PathBuf;
 
 static CBL_INCLUDE_DIR: &str = "libcblite-3.0.2/include";
 static CBL_LIB_DIR: &str = "libcblite-3.0.2/lib";
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     generate_bindings();
     configure_rustc();
-    copy_lib();
+    copy_lib()?;
+
+    Ok(())
 }
 
 fn generate_bindings() {
@@ -75,7 +78,7 @@ fn configure_rustc() {
     }
 }
 
-pub fn copy_lib() {
+pub fn copy_lib() -> Result<(), Box<dyn Error>> {
     let lib_path = PathBuf::from(format!(
         "{}/{}/{}/",
         env!("CARGO_MANIFEST_DIR"),
@@ -89,8 +92,7 @@ pub fn copy_lib() {
             std::fs::copy(
                 lib_path.join("libcblite.stripped.so"),
                 dest_path.join("libcblite.so"),
-            )
-            .unwrap();
+            )?;
         }
         "ios" => {
             // Nothing to copy there
@@ -99,35 +101,29 @@ pub fn copy_lib() {
             std::fs::copy(
                 lib_path.join("libcblite.so"),
                 dest_path.join("libcblite.so"),
-            )
-            .unwrap();
+            )?;
             std::fs::copy(
                 lib_path.join("libcblite.so.3"),
                 dest_path.join("libcblite.so.3"),
-            )
-            .unwrap();
+            )?;
             std::fs::copy(
                 lib_path.join("libcblite.so.3.0.2"),
                 dest_path.join("libcblite.so.3.0.2"),
-            )
-            .unwrap();
+            )?;
         }
         "macos" => {
             std::fs::copy(
                 lib_path.join("libcblite.dylib"),
                 dest_path.join("libcblite.dylib"),
-            )
-            .unwrap();
+            )?;
             std::fs::copy(
                 lib_path.join("libcblite.3.dylib"),
                 dest_path.join("libcblite.3.dylib"),
-            )
-            .unwrap();
+            )?;
             std::fs::copy(
                 lib_path.join("libcblite.3.0.2.dylib"),
                 dest_path.join("libcblite.3.0.2.dylib"),
-            )
-            .unwrap();
+            )?;
         }
         "windows" => {
             std::fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll")).unwrap();
@@ -140,4 +136,6 @@ pub fn copy_lib() {
             );
         }
     }
+
+    Ok(())
 }

@@ -34,6 +34,8 @@ fn basic_local_replication() {
     utils::with_three_dbs(
         config1,
         config2,
+        Box::new(ReplicationConfigurationContext::default()),
+        Box::new(ReplicationConfigurationContext::default()),
         |local_db1, local_db2, central_db, _repl1, _repl2| {
             // Save doc
             utils::add_doc(local_db1, "foo", 1234, "Hello World!");
@@ -64,6 +66,8 @@ fn pull_type_not_pushing() {
     utils::with_three_dbs(
         config1,
         config2,
+        Box::new(ReplicationConfigurationContext::default()),
+        Box::new(ReplicationConfigurationContext::default()),
         |local_db1, local_db2, central_db, _repl1, _repl2| {
             // Save doc in DB 1
             utils::add_doc(local_db1, "foo", 1234, "Hello World!");
@@ -101,6 +105,8 @@ fn push_type_not_pulling() {
     utils::with_three_dbs(
         config1,
         config2,
+        Box::new(ReplicationConfigurationContext::default()),
+        Box::new(ReplicationConfigurationContext::default()),
         |local_db1, local_db2, central_db, _repl1, _repl2| {
             // Save doc in DB 1
             utils::add_doc(local_db1, "foo", 1234, "Hello World!");
@@ -131,11 +137,11 @@ fn push_type_not_pulling() {
 
 #[test]
 fn document_ids() {
-    let mut array = MutableArray::new();
-    array.append().put_string("foo");
-    array.append().put_string("foo3");
+    let mut document_ids = MutableArray::new();
+    document_ids.append().put_string("foo");
+    document_ids.append().put_string("foo3");
     let config1 = utils::ReplicationTestConfiguration {
-        document_ids: array.as_array(),
+        document_ids,
         ..Default::default()
     };
     let config2: utils::ReplicationTestConfiguration = Default::default();
@@ -143,6 +149,8 @@ fn document_ids() {
     utils::with_three_dbs(
         config1,
         config2,
+        Box::new(ReplicationConfigurationContext::default()),
+        Box::new(ReplicationConfigurationContext::default()),
         |local_db1, _local_db2, central_db, _repl1, _repl2| {
             // Save doc 'foo' and 'foo2'
             utils::add_doc(local_db1, "foo", 1234, "Hello World!");
@@ -163,22 +171,34 @@ fn document_ids() {
 
 #[test]
 fn push_and_pull_filter() {
-    let config1 = utils::ReplicationTestConfiguration {
+    let config1 = utils::ReplicationTestConfiguration::default();
+    let config2 = utils::ReplicationTestConfiguration::default();
+
+    let context1 = ReplicationConfigurationContext {
         push_filter: Some(Box::new(|document, _is_deleted, _is_access_removed| {
             document.id() == "foo" || document.id() == "foo2"
         })),
-        ..Default::default()
+        pull_filter: None,
+        conflict_resolver: None,
+        property_encryptor: None,
+        property_decryptor: None,
     };
-    let config2 = utils::ReplicationTestConfiguration {
+
+    let context2 = ReplicationConfigurationContext {
+        push_filter: None,
         pull_filter: Some(Box::new(|document, _is_deleted, _is_access_removed| {
             document.id() == "foo2" || document.id() == "foo3"
         })),
-        ..Default::default()
+        conflict_resolver: None,
+        property_encryptor: None,
+        property_decryptor: None,
     };
 
     utils::with_three_dbs(
         config1,
         config2,
+        Box::new(context1),
+        Box::new(context2),
         |local_db1, local_db2, central_db, _repl1, _repl2| {
             // Save doc 'foo', 'foo2' & 'foo3'
             utils::add_doc(local_db1, "foo", 1234, "Hello World!");
@@ -216,20 +236,29 @@ fn push_and_pull_filter() {
 fn conflict_resolver() {
     let (sender, receiver) = std::sync::mpsc::channel();
 
-    let config1 = utils::ReplicationTestConfiguration {
+    let config1 = utils::ReplicationTestConfiguration::default();
+    let config2 = utils::ReplicationTestConfiguration::default();
+
+    let context1 = ReplicationConfigurationContext {
+        push_filter: None,
+        pull_filter: None,
         conflict_resolver: Some(Box::new(
             move |_document_id, _local_document, remote_document| {
                 sender.send(true).unwrap();
                 remote_document
             },
         )),
-        ..Default::default()
+        property_encryptor: None,
+        property_decryptor: None,
     };
-    let config2: utils::ReplicationTestConfiguration = Default::default();
+
+    let context2 = ReplicationConfigurationContext::default();
 
     utils::with_three_dbs(
         config1,
         config2,
+        Box::new(context1),
+        Box::new(context2),
         |local_db1, local_db2, central_db, repl1, _repl2| {
             let i = 1234;
             let i1 = 1;
@@ -327,20 +356,30 @@ fn decryptor(
 
 #[test]
 fn encryption_decryption() {
-    let config1 = utils::ReplicationTestConfiguration {
+    let config1 = utils::ReplicationTestConfiguration::default();
+    let config2 = utils::ReplicationTestConfiguration::default();
+
+    let context1 = ReplicationConfigurationContext {
+        push_filter: None,
+        pull_filter: None,
+        conflict_resolver: None,
         property_encryptor: Some(encryptor),
         property_decryptor: Some(decryptor),
-        ..Default::default()
     };
-    let config2 = utils::ReplicationTestConfiguration {
+
+    let context2 = ReplicationConfigurationContext {
+        push_filter: None,
+        pull_filter: None,
+        conflict_resolver: None,
         property_encryptor: Some(encryptor),
         property_decryptor: Some(decryptor),
-        ..Default::default()
     };
 
     utils::with_three_dbs(
         config1,
         config2,
+        Box::new(context1),
+        Box::new(context2),
         |local_db1, local_db2, central_db, _repl1, _repl2| {
             // Save doc 'foo' with an encryptable property
             {

@@ -33,7 +33,7 @@ impl ValueIndexConfiguration {
 }
 
 impl Database {
-    pub fn create_index(&self, name: &str, config: ValueIndexConfiguration) -> Result<bool> {
+    pub fn create_index(&self, name: &str, config: &ValueIndexConfiguration) -> Result<bool> {
         let mut err = CBLError::default();
         let slice = from_str(name);
         let r = unsafe {
