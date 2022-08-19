@@ -24,8 +24,8 @@
 
 extern crate bindgen;
 
-use std::error::Error;
 use std::env;
+use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
@@ -56,9 +56,7 @@ fn generate_bindings() -> Result<(), Box<dyn Error>> {
         .expect("Unable to generate bindings");
 
     let out_dir = env::var("OUT_DIR")?;
-    bindings
-        .write_to_file(PathBuf::from(out_dir).join("bindings.rs"))
-        .expect("Couldn't write bindings!");
+    bindings.write_to_file(PathBuf::from(out_dir).join("bindings.rs")).expect("Couldn't write bindings!");
 
     Ok(())
 }
@@ -68,8 +66,9 @@ fn configure_rustc() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={}", CBL_INCLUDE_DIR);
     println!("cargo:rerun-if-changed={}", CBL_LIB_DIR);
     let target_dir = env::var("TARGET")?;
+    println!("cargo:rustc-link-search={}/{}/{}", env!("CARGO_MANIFEST_DIR"), CBL_LIB_DIR, target_dir);
     println!(
-        "cargo:rustc-link-search={}/{}/{}",
+        "cargo:rustc-link-search=framework={}/{}/{}/CouchbaseLite.xcframework/ios-arm64_armv7",
         env!("CARGO_MANIFEST_DIR"),
         CBL_LIB_DIR,
         target_dir
@@ -87,45 +86,25 @@ fn configure_rustc() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn copy_lib() -> Result<(), Box<dyn Error>> {
-    let lib_path = PathBuf::from(format!(
-        "{}/{}/{}/",
-        env!("CARGO_MANIFEST_DIR"),
-        CBL_LIB_DIR,
-        env::var("TARGET").unwrap()
-    ));
+    let lib_path = PathBuf::from(format!("{}/{}/{}/", env!("CARGO_MANIFEST_DIR"), CBL_LIB_DIR, env::var("TARGET").unwrap()));
     let dest_path = PathBuf::from(format!("{}/", env::var("OUT_DIR")?));
 
     match env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
         "android" => {
-            fs::copy(
-                lib_path.join("libcblite.stripped.so"),
-                dest_path.join("libcblite.so"),
-            )?;
+            fs::copy(lib_path.join("libcblite.stripped.so"), dest_path.join("libcblite.so"))?;
         }
         "ios" => {
             // Nothing to copy there
         }
         "linux" => {
-            fs::copy(
-                lib_path.join("libcblite.so.3"),
-                dest_path.join("libcblite.so.3"),
-            )?;
+            fs::copy(lib_path.join("libcblite.so.3"), dest_path.join("libcblite.so.3"))?;
             // Needed only for build, not required for run
-            fs::copy(
-                lib_path.join("libcblite.so.3"),
-                dest_path.join("libcblite.so"),
-            )?;
+            fs::copy(lib_path.join("libcblite.so.3"), dest_path.join("libcblite.so"))?;
         }
         "macos" => {
-            fs::copy(
-                lib_path.join("libcblite.3.dylib"),
-                dest_path.join("libcblite.3.dylib"),
-            )?;
+            fs::copy(lib_path.join("libcblite.3.dylib"), dest_path.join("libcblite.3.dylib"))?;
             // Needed only for build, not required for run
-            fs::copy(
-                lib_path.join("libcblite.3.dylib"),
-                dest_path.join("libcblite.dylib"),
-            )?;
+            fs::copy(lib_path.join("libcblite.3.dylib"), dest_path.join("libcblite.dylib"))?;
         }
         "windows" => {
             fs::copy(lib_path.join("cblite.dll"), dest_path.join("cblite.dll"))?;
