@@ -112,7 +112,7 @@ pub fn copy_lib() -> Result<(), Box<dyn Error>> {
         }
         "ios" => {
             dir::copy(
-                lib_path.join("CouchbaseLite.xcframework/ios-arm64_armv7"),
+                lib_path.join("CouchbaseLite.xcframework"),
                 dest_path,
                 &dir::CopyOptions::new(),
             )?;
