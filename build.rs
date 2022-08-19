@@ -32,6 +32,14 @@ use std::path::PathBuf;
 static CBL_INCLUDE_DIR: &str = "libcblite-3.0.2/include";
 static CBL_LIB_DIR: &str = "libcblite-3.0.2/lib";
 
+fn headers_dir() -> &'static str {
+    if env::var("CARGO_CFG_TARGET_OS").unwrap() == "ios" {
+        "libcblite-3.0.2/lib/aarch64-apple-ios/CouchbaseLite.xcframework/ios-arm64_armv7/CouchbaseLite.framework/Headers"
+    } else {
+        CBL_INCLUDE_DIR
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     generate_bindings()?;
     configure_rustc()?;
@@ -43,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn generate_bindings() -> Result<(), Box<dyn Error>> {
     let bindings = bindgen::Builder::default()
         .header("src/wrapper.h")
-        .clang_arg(format!("-I{}", CBL_INCLUDE_DIR))
+        .clang_arg(format!("-I{}", headers_dir()))
         .whitelist_type("CBL.*")
         .whitelist_type("FL.*")
         .whitelist_var("k?CBL.*")
