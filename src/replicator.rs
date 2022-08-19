@@ -66,13 +66,12 @@ impl Endpoint {
     pub fn new_with_url(url: &str) -> Result<Self> {
         unsafe {
             let mut error = CBLError::default();
-            let url = format!("{}/", url);
             let endpoint: *mut CBLEndpoint =
-                CBLEndpoint_CreateWithURL(from_str(&url).get_ref(), std::ptr::addr_of_mut!(error));
+                CBLEndpoint_CreateWithURL(from_str(url).get_ref(), std::ptr::addr_of_mut!(error));
 
             check_error(&error).map(|_| Self {
                 cbl_ref: retain(endpoint),
-                url: Some(url),
+                url: Some(url.to_string()),
             })
         }
     }
