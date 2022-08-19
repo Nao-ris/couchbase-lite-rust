@@ -33,8 +33,10 @@ static CBL_INCLUDE_DIR: &str = "libcblite-3.0.2/include";
 static CBL_LIB_DIR: &str = "libcblite-3.0.2/lib";
 
 fn headers_dir() -> &'static str {
-    if env::var("CARGO_CFG_TARGET_OS").unwrap() == "ios" {
+    if env::var("TARGET").unwrap().ends_with("apple-ios") {
         "libcblite-3.0.2/lib/aarch64-apple-ios/CouchbaseLite.xcframework/ios-arm64_armv7/CouchbaseLite.framework/Headers"
+    } else if env::var("TARGET").unwrap().ends_with("apple-ios-sim") {
+        "libcblite-3.0.2/lib/aarch64-apple-ios/CouchbaseLite.xcframework/ios-arm64_i386_x86_64-simulator/CouchbaseLite.framework/Headers"
     } else {
         CBL_INCLUDE_DIR
     }
