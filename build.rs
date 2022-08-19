@@ -23,11 +23,13 @@
 // - https://doc.rust-lang.org/cargo/reference/build-scripts.html
 
 extern crate bindgen;
+extern crate fs_extra;
 
 use std::env;
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
+use fs_extra::dir;
 
 static CBL_INCLUDE_DIR: &str = "libcblite-3.0.2/include";
 static CBL_LIB_DIR: &str = "libcblite-3.0.2/lib";
@@ -109,7 +111,11 @@ pub fn copy_lib() -> Result<(), Box<dyn Error>> {
             )?;
         }
         "ios" => {
-            // Nothing to copy there
+            dir::copy(
+                lib_path.join("CouchbaseLite.xcframework/ios-arm64_armv7"),
+                dest_path,
+                &dir::CopyOptions::new(),
+            )?;
         }
         "linux" => {
             fs::copy(
