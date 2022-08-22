@@ -53,6 +53,7 @@ fn generate_bindings() -> Result<(), Box<dyn Error>> {
         .whitelist_function("CBL.*")
         .whitelist_function("_?FL.*")
         .no_copy("FLSliceResult")
+        .size_t_is_usize(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate bindings");
@@ -121,6 +122,26 @@ pub fn copy_lib() -> Result<(), Box<dyn Error>> {
             fs::copy(
                 lib_path.join("libcblite.so.3"),
                 dest_path.join("libcblite.so.3"),
+            )?;
+            fs::copy(
+                lib_path.join("libicudata.so.66"),
+                dest_path.join("libicudata.so.66"),
+            )?;
+            fs::copy(
+                lib_path.join("libicui18n.so.66"),
+                dest_path.join("libicui18n.so.66"),
+            )?;
+            fs::copy(
+                lib_path.join("libicuio.so.66"),
+                dest_path.join("libicuio.so.66"),
+            )?;
+            fs::copy(
+                lib_path.join("libicutu.so.66"),
+                dest_path.join("libicutu.so.66"),
+            )?;
+            fs::copy(
+                lib_path.join("libicuuc.so.66"),
+                dest_path.join("libicuuc.so.66"),
             )?;
             // Needed only for build, not required for run
             fs::copy(

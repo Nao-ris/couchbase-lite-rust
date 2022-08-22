@@ -28,7 +28,7 @@ use crate::{
     },
 };
 
-use std::{ffi::c_void, convert::TryInto};
+use std::ffi::c_void;
 use std::marker::PhantomData;
 
 /** A binary attachment to a Document. */
@@ -174,7 +174,7 @@ impl<'r> std::io::Read for BlobReader<'r> {
                 CBLBlobReader_Read(
                     self.get_ref(),
                     buf.as_mut_ptr().cast::<c_void>(),
-                    buf.len().try_into().unwrap(),
+                    buf.len(),
                     err,
                 )
             })
@@ -229,7 +229,7 @@ impl<'r> std::io::Write for BlobWriter<'r> {
                 let ok = CBLBlobWriter_Write(
                     self.get_ref(),
                     data.as_ptr().cast::<c_void>(),
-                    data.len().try_into().unwrap(),
+                    data.len(),
                     err,
                 );
                 if ok {
