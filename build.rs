@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn find_mac_sdk(builder: bindgen::Builder) -> Result<bindgen::Builder, Box<dyn Error>> {
+fn bindgen_for_mac(builder: bindgen::Builder) -> Result<bindgen::Builder, Box<dyn Error>> {
     if env::var("CARGO_CFG_TARGET_OS")? != "macos" {
         return Ok(builder);
     }
@@ -59,7 +59,7 @@ fn find_mac_sdk(builder: bindgen::Builder) -> Result<bindgen::Builder, Box<dyn E
 }
 
 fn generate_bindings() -> Result<(), Box<dyn Error>> {
-    let bindings = find_mac_sdk(bindgen::Builder::default())?
+    let bindings = bindgen_for_mac(bindgen::Builder::default())?
         .header("src/wrapper.h")
         .clang_arg(format!("-I{}", CBL_INCLUDE_DIR))
         .whitelist_type("CBL.*")
