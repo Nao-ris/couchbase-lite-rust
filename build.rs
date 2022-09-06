@@ -70,7 +70,6 @@ fn generate_bindings() -> Result<(), Box<dyn Error>> {
         .whitelist_function("_?FL.*")
         .no_copy("FLSliceResult")
         .size_t_is_usize(true)
-        .clang_arg(format!("-isysroot{}", sdk))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate bindings");
