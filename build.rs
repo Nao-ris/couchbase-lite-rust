@@ -29,6 +29,7 @@ use std::env;
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 use fs_extra::dir;
 
 static CBL_INCLUDE_DIR: &str = "libcblite-3.0.2/include";
@@ -42,7 +43,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn find_mac_sdk() -> Result<String, Box<dyn Error>> {
+    if env::var("CARGO_CFG_TARGET_OS")? != "macos" {
+        return Ok("".to_string());
+    }
+
+    let sdk = String::from_utf8(
+        Command::new("xcrun")
+            .args(["--sdk", "macosx", "--show-sdk-path"])
+            .output()
+            .expect("failed to execute process")
+            .stdout,
+    )?;
+    Ok(sdk.trim().to_string())
+}
+
 fn generate_bindings() -> Result<(), Box<dyn Error>> {
+    let sdk = find_mac_sdk()?;
+
     let bindings = bindgen::Builder::default()
         .header("src/wrapper.h")
         .clang_arg(format!("-I{}", CBL_INCLUDE_DIR))
@@ -54,6 +72,7 @@ fn generate_bindings() -> Result<(), Box<dyn Error>> {
         .whitelist_function("_?FL.*")
         .no_copy("FLSliceResult")
         .size_t_is_usize(true)
+        .clang_arg(format!("-isysroot{}", sdk))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate bindings");
