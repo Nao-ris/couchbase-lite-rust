@@ -43,9 +43,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn find_mac_sdk() -> Result<String, Box<dyn Error>> {
+fn find_mac_sdk(builder: bindgen::Builder) -> Result<bindgen::Builder, Box<dyn Error>> {
     if env::var("CARGO_CFG_TARGET_OS")? != "macos" {
-        return Ok("".to_string());
+        return Ok(builder);
     }
 
     let sdk = String::from_utf8(
@@ -55,13 +55,11 @@ fn find_mac_sdk() -> Result<String, Box<dyn Error>> {
             .expect("failed to execute process")
             .stdout,
     )?;
-    Ok(sdk.trim().to_string())
+    Ok(builder.clang_arg(format!("-isysroot{}", sdk.trim())))
 }
 
 fn generate_bindings() -> Result<(), Box<dyn Error>> {
-    let sdk = find_mac_sdk()?;
-
-    let bindings = bindgen::Builder::default()
+    let bindings = find_mac_sdk(bindgen::Builder::default())?
         .header("src/wrapper.h")
         .clang_arg(format!("-I{}", CBL_INCLUDE_DIR))
         .whitelist_type("CBL.*")
@@ -72,7 +70,6 @@ fn generate_bindings() -> Result<(), Box<dyn Error>> {
         .whitelist_function("_?FL.*")
         .no_copy("FLSliceResult")
         .size_t_is_usize(true)
-        .clang_arg(format!("-isysroot{}", sdk))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate bindings");
