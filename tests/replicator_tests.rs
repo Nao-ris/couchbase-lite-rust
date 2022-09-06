@@ -331,27 +331,23 @@ fn encryptor(
     _document_id: Option<String>,
     _properties: Dict,
     _key_path: Option<String>,
-    input: Option<Vec<u8>>,
+    input: Vec<u8>,
     _algorithm: Option<String>,
     _kid: Option<String>,
     _error: &Error,
-) -> Vec<u8> {
-    input
-        .map(|v| v.iter().map(|u| u ^ 48).collect())
-        .unwrap_or(vec![])
+) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+    Ok(input.iter().map(|u| u ^ 48).collect())
 }
 fn decryptor(
     _document_id: Option<String>,
     _properties: Dict,
     _key_path: Option<String>,
-    input: Option<Vec<u8>>,
+    input: Vec<u8>,
     _algorithm: Option<String>,
     _kid: Option<String>,
     _error: &Error,
-) -> Vec<u8> {
-    input
-        .map(|v| v.iter().map(|u| u ^ 48).collect())
-        .unwrap_or(vec![])
+) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+    Ok(input.iter().map(|u| u ^ 48).collect())
 }
 
 #[test]
