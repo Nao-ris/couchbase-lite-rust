@@ -515,6 +515,8 @@ pub struct Replicator {
     pub context: Option<Box<ReplicationConfigurationContext>>,
 }
 
+unsafe impl Send for Replicator {}
+
 impl CblRef for Replicator {
     type Output = *mut CBLReplicator;
     fn get_ref(&self) -> Self::Output {

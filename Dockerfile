@@ -8,5 +8,3 @@ ADD Cargo.toml Cargo.toml
 ADD build.rs build.rs
 ADD libcblite-3.0.2 libcblite-3.0.2
 ADD src src
-RUN cargo c
-RUN cargo test -- --test-threads=1
