@@ -20,7 +20,6 @@ extern crate lazy_static;
 
 use self::couchbase_lite::*;
 use encryptable::Encryptable;
-use std::thread;
 use std::time::Duration;
 
 pub mod utils;
@@ -458,59 +457,5 @@ mod unsafe_test {
                 ));
             },
         );
-    }
-}
-
-fn start_stop() {
-    utils::with_db(|db| {
-        let token = "token";
-        let endpoint = Endpoint::new_with_url("wss://localhost:443/billeo-db").unwrap();
-        let context = ReplicationConfigurationContext {
-            push_filter: None,
-            pull_filter: None,
-            conflict_resolver: None,
-            property_encryptor: None,
-            property_decryptor: None,
-        };
-
-        let mut replicator = Replicator::new(
-            ReplicatorConfiguration {
-                database: db.clone(),                         // The database to replicate
-                endpoint: endpoint.clone(), // The address of the other database to replicate with
-                replicator_type: ReplicatorType::PushAndPull, // Push, pull or both
-                continuous: true,           // Continuous replication?
-                disable_auto_purge: true,
-                max_attempts: 0,
-                max_attempt_wait_time: 0,
-                heartbeat: 0, //< The heartbeat interval in seconds. Specify 0 to use the default value of 300 seconds.
-                authenticator: None, // Authentication credentials, if needed
-                proxy: None,  // HTTP client proxy settings
-                headers: vec![(
-                    "Cookie".to_string(),
-                    format!("SyncGatewaySession={}", token),
-                )]
-                .into_iter()
-                .collect(), // Extra HTTP headers to add to the WebSocket request
-                pinned_server_certificate: None, // An X.509 cert to "pin" TLS connections to (PEM or DER)
-                trusted_root_certificates: None, // Set of anchor certs (PEM format)
-                channels: MutableArray::default(), // Optional set of channels to pull from
-                document_ids: MutableArray::default(), // Optional set of document IDs to replicate
-            },
-            Box::new(context),
-        )
-        .unwrap();
-
-        replicator.start(false);
-
-        thread::sleep(Duration::from_secs(1));
-    });
-}
-
-#[test]
-fn remote_replication_segfault() {
-    for i in 0..10 {
-        start_stop();
-        thread::sleep(Duration::from_secs(1));
-        start_stop();
     }
 }
