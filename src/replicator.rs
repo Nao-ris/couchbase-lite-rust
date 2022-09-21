@@ -70,7 +70,7 @@ impl Endpoint {
                 CBLEndpoint_CreateWithURL(from_str(url).get_ref(), std::ptr::addr_of_mut!(error));
 
             check_error(&error).map(|_| Self {
-                cbl_ref: retain(endpoint),
+                cbl_ref: endpoint,
                 url: Some(url.to_string()),
             })
         }
@@ -79,7 +79,7 @@ impl Endpoint {
     pub fn new_with_local_db(db: &Database) -> Self {
         unsafe {
             Self {
-                cbl_ref: retain(CBLEndpoint_CreateWithLocalDB(db.get_ref())),
+                cbl_ref: CBLEndpoint_CreateWithLocalDB(db.get_ref()),
                 url: None,
             }
         }
@@ -88,19 +88,9 @@ impl Endpoint {
 
 impl Clone for Endpoint {
     fn clone(&self) -> Self {
-        unsafe {
-            Self {
-                cbl_ref: retain(self.cbl_ref),
-                url: self.url.clone(),
-            }
-        }
-    }
-}
-
-impl Drop for Endpoint {
-    fn drop(&mut self) {
-        unsafe {
-            release(self.get_ref());
+        Self {
+            cbl_ref: self.cbl_ref,
+            url: self.url.clone(),
         }
     }
 }
@@ -122,10 +112,10 @@ impl Authenticator {
     pub fn create_password(username: &str, password: &str) -> Self {
         unsafe {
             Self {
-                cbl_ref: retain(CBLAuth_CreatePassword(
+                cbl_ref: CBLAuth_CreatePassword(
                     from_str(username).get_ref(),
                     from_str(password).get_ref(),
-                )),
+                ),
             }
         }
     }
@@ -133,10 +123,10 @@ impl Authenticator {
     pub fn create_session(session_id: &str, cookie_name: &str) -> Self {
         unsafe {
             Self {
-                cbl_ref: retain(CBLAuth_CreateSession(
+                cbl_ref: CBLAuth_CreateSession(
                     from_str(session_id).get_ref(),
                     from_str(cookie_name).get_ref(),
-                )),
+                ),
             }
         }
     }
@@ -144,18 +134,8 @@ impl Authenticator {
 
 impl Clone for Authenticator {
     fn clone(&self) -> Self {
-        unsafe {
-            Self {
-                cbl_ref: retain(self.cbl_ref),
-            }
-        }
-    }
-}
-
-impl Drop for Authenticator {
-    fn drop(&mut self) {
-        unsafe {
-            release(self.get_ref());
+        Self {
+            cbl_ref: self.cbl_ref,
         }
     }
 }
