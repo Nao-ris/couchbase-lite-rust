@@ -18,126 +18,33 @@
 extern crate couchbase_lite;
 extern crate tempdir;
 
-use self::couchbase_lite::*;
-use std::thread;
-use std::time::Duration;
-
+use couchbase_lite::{ConcurrencyControl, Database, DatabaseConfiguration, Document, FleeceReference};
 use tempdir::TempDir;
 
-pub const DB_NAME: &str = "test_db";
-
-const LEVEL_PREFIX: [&str; 5] = ["((", "_", "", "WARNING: ", "***ERROR: "];
-const LEVEL_SUFFIX: [&str; 5] = ["))", "_", "", "", " ***"];
-
-fn logger(domain: logging::Domain, level: logging::Level, message: &str) {
-    // Log to stdout, not stderr, so that `cargo test` will buffer the output.
-    let i = level as usize;
-    println!(
-        "CBL {:?}: {}{}{}",
-        domain, LEVEL_PREFIX[i], message, LEVEL_SUFFIX[i]
-    )
-}
-
-pub fn with_db<F>(f: F)
-where
-    F: Fn(&mut Database),
-{
-    logging::set_callback(Some(logger));
-    logging::set_callback_level(logging::Level::Verbose);
-    logging::set_console_level(logging::Level::None);
-
+fn main() {
+    // Create a new database in a temporary directory:
     let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
     let cfg = DatabaseConfiguration {
         directory: tmp_dir.path(),
         encryption_key: None,
     };
-    let mut db = Database::open(DB_NAME, Some(cfg)).expect("open db");
-    assert!(Database::exists(DB_NAME, tmp_dir.path()));
+    let mut db = Database::open("main_db", Some(cfg)).expect("open db");
 
-    f(&mut db);
+    // Create and save a new document:
+    {
+        //logging::set_level(logging::Level::Info, logging::Domain::All);
+        let mut doc = Document::new_with_id("foo");
+        let mut props = doc.mutable_properties();
+        props.at("i").put_i64(1234);
+        props.at("s").put_string("Hello World!");
 
-    db.delete().unwrap();
-}
-
-fn main() {
-    with_db(|db| {
-        // Start replication
-        let token = "test_token";
-        let endpoint1 = Endpoint::new_with_url("ws://localhost:4984/billeo-db/").unwrap();
-        let endpoint2 = Endpoint::new_with_url("ws://localhost:4984/billeo-db/").unwrap();
-
-        let config1 = ReplicatorConfiguration {
-            database: db.clone(),
-            endpoint: endpoint1,
-            replicator_type: ReplicatorType::PushAndPull,
-            continuous: true,
-            disable_auto_purge: true,
-            max_attempts: 4,
-            max_attempt_wait_time: 100,
-            heartbeat: 120,
-            authenticator: None,
-            proxy: None,
-            headers: vec![(
-                "Cookie".to_string(),
-                format!("SyncGatewaySession={}", token),
-            )]
-            .into_iter()
-            .collect(),
-            pinned_server_certificate: None,
-            trusted_root_certificates: None,
-            channels: MutableArray::default(),
-            document_ids: MutableArray::default(),
-        };
-        let config2 = ReplicatorConfiguration {
-            database: db.clone(),
-            endpoint: endpoint2,
-            replicator_type: ReplicatorType::PushAndPull,
-            continuous: true,
-            disable_auto_purge: true,
-            max_attempts: 4,
-            max_attempt_wait_time: 100,
-            heartbeat: 120,
-            authenticator: None,
-            proxy: None,
-            headers: vec![(
-                "Cookie".to_string(),
-                format!("SyncGatewaySession={}", token),
-            )]
-            .into_iter()
-            .collect(),
-            pinned_server_certificate: None,
-            trusted_root_certificates: None,
-            channels: MutableArray::default(),
-            document_ids: MutableArray::default(),
-        };
-        let context1 = ReplicationConfigurationContext {
-            push_filter: None,
-            pull_filter: None,
-            conflict_resolver: None,
-            property_encryptor: None,
-            property_decryptor: None,
-        };
-        let context2 = ReplicationConfigurationContext {
-            push_filter: None,
-            pull_filter: None,
-            conflict_resolver: None,
-            property_encryptor: None,
-            property_decryptor: None,
-        };
-
-        let mut repl1 = Replicator::new(config1, Box::new(context1)).unwrap();
-        let mut repl2 = Replicator::new(config2, Box::new(context2)).unwrap();
-
-        thread::spawn(move || loop {
-            repl1.start(false);
-            thread::sleep(Duration::from_millis(100));
-            repl1.stop();
-        });
-        thread::spawn(move || loop {
-            repl2.start(false);
-            thread::sleep(Duration::from_millis(150));
-            repl2.stop();
-        });
-        thread::sleep(Duration::from_millis(100000));
-    });
+        db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
+            .expect("save");
+    }
+    // Reload the document and verify its properties:
+    {
+        let doc = db.get_document("foo").expect("reload document");
+        let props = doc.properties();
+        assert_eq!(props.to_json(), r#"{"i":1234,"s":"Hello World!"}"#);
+    }
 }

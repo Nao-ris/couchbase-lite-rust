@@ -461,69 +461,11 @@ mod unsafe_test {
     }
 }
 
-#[test]
-fn remote_replication() {
+fn start_stop() {
     utils::with_db(|db| {
-        // Save doc
-        utils::add_doc(db, "foo", 1234, "Hello World!");
-
-        // Start replication
-        let token = "test_token";
-        let endpoint1 = Endpoint::new_with_url("ws://localhost:4984/billeo-db/").unwrap();
-        let endpoint2 = Endpoint::new_with_url("ws://localhost:4984/billeo-db/").unwrap();
-
-        let config1 = ReplicatorConfiguration {
-            database: db.clone(),
-            endpoint: endpoint1,
-            replicator_type: ReplicatorType::PushAndPull,
-            continuous: true,
-            disable_auto_purge: true,
-            max_attempts: 4,
-            max_attempt_wait_time: 100,
-            heartbeat: 120,
-            authenticator: None,
-            proxy: None,
-            headers: vec![(
-                "Cookie".to_string(),
-                format!("SyncGatewaySession={}", token),
-            )]
-            .into_iter()
-            .collect(),
-            pinned_server_certificate: None,
-            trusted_root_certificates: None,
-            channels: MutableArray::default(),
-            document_ids: MutableArray::default(),
-        };
-        let config2 = ReplicatorConfiguration {
-            database: db.clone(),
-            endpoint: endpoint2,
-            replicator_type: ReplicatorType::PushAndPull,
-            continuous: true,
-            disable_auto_purge: true,
-            max_attempts: 4,
-            max_attempt_wait_time: 100,
-            heartbeat: 120,
-            authenticator: None,
-            proxy: None,
-            headers: vec![(
-                "Cookie".to_string(),
-                format!("SyncGatewaySession={}", token),
-            )]
-            .into_iter()
-            .collect(),
-            pinned_server_certificate: None,
-            trusted_root_certificates: None,
-            channels: MutableArray::default(),
-            document_ids: MutableArray::default(),
-        };
-        let context1 = ReplicationConfigurationContext {
-            push_filter: None,
-            pull_filter: None,
-            conflict_resolver: None,
-            property_encryptor: None,
-            property_decryptor: None,
-        };
-        let context2 = ReplicationConfigurationContext {
+        let token = "token";
+        let endpoint = Endpoint::new_with_url("wss://localhost:443/billeo-db").unwrap();
+        let context = ReplicationConfigurationContext {
             push_filter: None,
             pull_filter: None,
             conflict_resolver: None,
@@ -531,19 +473,44 @@ fn remote_replication() {
             property_decryptor: None,
         };
 
-        let mut repl1 = Replicator::new(config1, Box::new(context1)).unwrap();
-        let mut repl2 = Replicator::new(config2, Box::new(context2)).unwrap();
+        let mut replicator = Replicator::new(
+            ReplicatorConfiguration {
+                database: db.clone(),                         // The database to replicate
+                endpoint: endpoint.clone(), // The address of the other database to replicate with
+                replicator_type: ReplicatorType::PushAndPull, // Push, pull or both
+                continuous: true,           // Continuous replication?
+                disable_auto_purge: true,
+                max_attempts: 0,
+                max_attempt_wait_time: 0,
+                heartbeat: 0, //< The heartbeat interval in seconds. Specify 0 to use the default value of 300 seconds.
+                authenticator: None, // Authentication credentials, if needed
+                proxy: None,  // HTTP client proxy settings
+                headers: vec![(
+                    "Cookie".to_string(),
+                    format!("SyncGatewaySession={}", token),
+                )]
+                .into_iter()
+                .collect(), // Extra HTTP headers to add to the WebSocket request
+                pinned_server_certificate: None, // An X.509 cert to "pin" TLS connections to (PEM or DER)
+                trusted_root_certificates: None, // Set of anchor certs (PEM format)
+                channels: MutableArray::default(), // Optional set of channels to pull from
+                document_ids: MutableArray::default(), // Optional set of document IDs to replicate
+            },
+            Box::new(context),
+        )
+        .unwrap();
 
-        thread::spawn(move || loop {
-            repl1.start(false);
-            thread::sleep(Duration::from_millis(100));
-            repl1.stop();
-        });
-        thread::spawn(move || loop {
-            repl2.start(false);
-            thread::sleep(Duration::from_millis(100));
-            repl2.stop();
-        });
-        thread::sleep(Duration::from_millis(100000));
+        replicator.start(false);
+
+        thread::sleep(Duration::from_secs(1));
     });
+}
+
+#[test]
+fn remote_replication_segfault() {
+    for i in 0..10 {
+        start_stop();
+        thread::sleep(Duration::from_secs(1));
+        start_stop();
+    }
 }
