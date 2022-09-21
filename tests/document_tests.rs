@@ -307,3 +307,44 @@ fn database_document_expiration() {
         assert_eq!(expiration.unwrap().0, 1000000000);
     });
 }
+
+#[test]
+fn document_revision_limit() {
+    utils::with_db(|db| {
+        for n in 0..10000 {
+            let mut document = db.get_document("foo");
+            if let Ok(mut document) = document {
+                document.mutable_properties().at("index").put_i64(n);
+                db.save_document(&mut document).expect("save_document");
+            } else {
+                let mut document = Document::new_with_id("foo");
+                document.mutable_properties().at("index").put_i64(n);
+                db.save_document(&mut document).expect("save_document");
+            }
+        }
+
+        // Document found in DB
+        let document = db.get_document("foo").unwrap();
+        assert!(!document.is_deleted()); // not deleted
+        assert!(document.revision_id().unwrap().starts_with("10000")); // revision 10 000
+
+        // Only one document found in DB
+        let query =
+            Query::new(db, QueryLanguage::N1QL, "select _.* from _ ").expect("create query");
+        let mut results = query.execute().expect("execute");
+
+        let mut documents_count = 0;
+        loop {
+            if let Some(_) = results.next() {
+                documents_count = documents_count + 1;
+            } else {
+                break;
+            }
+        }
+        assert_eq!(documents_count, 1);
+
+        // But if we open the database and run the command 'revs foo', we get thousands of revisions
+        // instead of the maximum of 20 that we are supposed to have, which greatly slows down updates
+        // on the document
+    });
+}
