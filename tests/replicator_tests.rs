@@ -327,6 +327,182 @@ fn conflict_resolver() {
     );
 }
 
+#[test]
+fn conflict_resolver_save_keep_local() {
+    let config1 = utils::ReplicationTestConfiguration::default();
+    let config2 = utils::ReplicationTestConfiguration::default();
+
+    let context1 = ReplicationConfigurationContext::default();
+    let context2 = ReplicationConfigurationContext::default();
+
+    utils::with_three_dbs(
+        config1,
+        config2,
+        Box::new(context1),
+        Box::new(context2),
+        |local_db1, _local_db2, central_db, repl1, _repl2| {
+            let i = 1234;
+            let i1 = 1;
+            let i2 = 2;
+
+            // Save doc 'foo'
+            utils::add_doc(local_db1, "foo", i, "Hello World!");
+
+            // Check 'foo' is replicated to central
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+
+            // Stop replication on DB 1
+            repl1.stop();
+
+            // Modify 'foo' in central
+            let mut foo = central_db.get_document("foo").unwrap();
+            foo.mutable_properties().at("i").put_i64(i2);
+            central_db
+                .save_document_with_concurency_control(&mut foo, ConcurrencyControl::FailOnConflict)
+                .expect("save");
+
+            // Fetch 'foo' in DB 1
+            let mut foo = local_db1.get_document("foo").unwrap();
+
+            // Restart replication
+            repl1.start(false);
+
+            // Check central version of 'foo' is replicated to DB 1
+            assert!(utils::check_callback_with_wait(
+                || local_db1
+                    .get_document("foo")
+                    .expect("foo exists")
+                    .properties()
+                    .get("i")
+                    .as_i64_or_0()
+                    == i2,
+                None
+            ));
+
+            // Modify 'foo' in DB1 from outdated document
+            foo.mutable_properties().at("i").put_i64(i1);
+            assert!(local_db1
+                .save_document_resolving(&mut foo, move |_, _| true)
+                .is_ok());
+
+            // Assert conflict was resolved by keeping latest version
+            assert!(utils::check_callback_with_wait(
+                || local_db1
+                    .get_document("foo")
+                    .expect("foo exists")
+                    .properties()
+                    .get("i")
+                    .as_i64_or_0()
+                    == i1,
+                None
+            ));
+
+            // Check 'foo' new version replicated to central
+            assert!(utils::check_callback_with_wait(
+                || central_db
+                    .get_document("foo")
+                    .expect("foo exists")
+                    .properties()
+                    .get("i")
+                    .as_i64_or_0()
+                    == i1,
+                None
+            ));
+        },
+    );
+}
+
+#[test]
+fn conflict_resolver_save_keep_remote() {
+    let config1 = utils::ReplicationTestConfiguration::default();
+    let config2 = utils::ReplicationTestConfiguration::default();
+
+    let context1 = ReplicationConfigurationContext::default();
+    let context2 = ReplicationConfigurationContext::default();
+
+    utils::with_three_dbs(
+        config1,
+        config2,
+        Box::new(context1),
+        Box::new(context2),
+        |local_db1, _local_db2, central_db, repl1, _repl2| {
+            let i = 1234;
+            let i1 = 1;
+            let i2 = 2;
+
+            // Save doc 'foo'
+            utils::add_doc(local_db1, "foo", i, "Hello World!");
+
+            // Check 'foo' is replicated to central
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+
+            // Stop replication on DB 1
+            repl1.stop();
+
+            // Modify 'foo' in central
+            let mut foo = central_db.get_document("foo").unwrap();
+            foo.mutable_properties().at("i").put_i64(i2);
+            central_db
+                .save_document_with_concurency_control(&mut foo, ConcurrencyControl::FailOnConflict)
+                .expect("save");
+
+            // Fetch 'foo' in DB 1
+            let mut foo = local_db1.get_document("foo").unwrap();
+
+            // Restart replication
+            repl1.start(false);
+
+            // Check central version of 'foo' is replicated to DB 1
+            assert!(utils::check_callback_with_wait(
+                || local_db1
+                    .get_document("foo")
+                    .expect("foo exists")
+                    .properties()
+                    .get("i")
+                    .as_i64_or_0()
+                    == i2,
+                None
+            ));
+
+            // Modify 'foo' in DB1 from outdated document
+            foo.mutable_properties().at("i").put_i64(i1);
+            assert!(local_db1
+                .save_document_resolving(&mut foo, move |_, _| false)
+                .is_err());
+
+            // Assert conflict was resolved by keeping central's version
+            assert!(utils::check_callback_with_wait(
+                || local_db1
+                    .get_document("foo")
+                    .expect("foo exists")
+                    .properties()
+                    .get("i")
+                    .as_i64_or_0()
+                    == i2,
+                None
+            ));
+
+            // Check 'foo' was unchanged in central
+            assert!(utils::check_callback_with_wait(
+                || central_db
+                    .get_document("foo")
+                    .expect("foo exists")
+                    .properties()
+                    .get("i")
+                    .as_i64_or_0()
+                    == i2,
+                None
+            ));
+        },
+    );
+}
+
 fn encryptor(
     _document_id: Option<String>,
     _properties: Dict,
