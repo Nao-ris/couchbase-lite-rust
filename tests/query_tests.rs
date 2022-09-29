@@ -4,6 +4,8 @@ use couchbase_lite::index::ValueIndexConfiguration;
 
 use self::couchbase_lite::*;
 
+use std::time::Instant;
+
 pub mod utils;
 
 #[test]
@@ -82,5 +84,61 @@ fn indexes() {
 
         db.delete_index("new_index").unwrap();
         assert_eq!(db.get_index_names().count(), 0);
+    });
+}
+
+#[test]
+fn long_new_query() {
+    utils::with_db(|db| {
+        let now = Instant::now();
+        let query = Query::new(
+            db,
+            QueryLanguage::N1QL,
+            "SELECT facture.* FROM _ facture \
+            WHERE facture.type = 'FactureModel' \
+            AND facture.statut NOT IN ('Annulee', 'Brouillon', 'Valide') \
+            AND ((facture.facture.totalFacture.totalParticipationAssure - ifnull(facture.facture.totalFacture.totalRemboursablePartComplementaire, 0)) > 0 OR facture.tpAmo = false) \
+            AND (facture.liquidation IS NULL OR ifnull(facture.liquidation.etatPaiementPartAssure, 'enAttente') = 'enAttente' AND ifnull(facture.liquidation.montantPayeAssure, 0) == 0)",
+        )
+        .expect("create query");
+        println!(
+            "=> Doctolib - CBLDatabase_CreateQuery elapsed: {:?}",
+            now.elapsed()
+        );
+
+        let now = Instant::now();
+        assert!(query.execute().is_ok());
+        println!(
+            "=> Doctolib - CBLQuery_Execute elapsed: {:?}",
+            now.elapsed()
+        );
+    });
+}
+
+#[test]
+fn long_new_query_no_ifnull() {
+    utils::with_db(|db| {
+        let now = Instant::now();
+        let query = Query::new(
+            db,
+            QueryLanguage::N1QL,
+            "SELECT facture.* FROM _ facture \
+            WHERE facture.type = 'FactureModel' \
+            AND facture.statut NOT IN ('Annulee', 'Brouillon', 'Valide') \
+            AND ((facture.facture.totalFacture.totalParticipationAssure) > 0 OR facture.tpAmo = false) \
+            AND (facture.liquidation IS NULL)",
+        )
+        .expect("create query");
+        println!(
+            "=> Doctolib - CBLDatabase_CreateQuery elapsed: {:?}",
+            now.elapsed()
+        );
+
+        let now = Instant::now();
+        assert!(query.execute().is_ok());
+        println!(
+            "=> Doctolib - CBLQuery_Execute elapsed: {:?}",
+            now.elapsed()
+        );
     });
 }
