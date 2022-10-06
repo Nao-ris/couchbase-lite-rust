@@ -88,7 +88,7 @@ fn indexes() {
 }
 
 #[test]
-fn long_new_query() {
+fn long_new_query_ifnull() {
     utils::with_db(|db| {
         let now = Instant::now();
         let query = Query::new(
