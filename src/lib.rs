@@ -52,6 +52,10 @@ use self::c_api::{
     CBLListenerToken, CBLRefCounted, CBL_DumpInstances, CBL_InstanceCount, CBL_Release, CBL_Retain,
     CBLListener_Remove,
 };
+#[cfg(target_os = "android")]
+use self::c_api::{CBLError, CBLInitContext, CBL_Init};
+#[cfg(target_os = "android")]
+use std::ffi::CStr;
 
 //////// RE-EXPORT:
 
@@ -135,4 +139,39 @@ pub(crate) unsafe fn retain<T>(cbl_ref: *mut T) -> *mut T {
 
 pub(crate) unsafe fn release<T>(cbl_ref: *mut T) {
     CBL_Release(cbl_ref.cast::<CBLRefCounted>());
+}
+
+//////// ANDROID INIT
+
+/** Application context information required for Android application to initialize before using
+CouchbaseLite library. */
+#[cfg(target_os = "android")]
+pub struct AndroidInitContext {
+    pub files_directory: &'static CStr, //< The directory where the opened database will be stored when a specific database directory is not specified in \ref CBLDatabaseConfiguration.
+    //< Normally the path returned from Android Context's getFilesDir() method can be specified here unless different directory is desired.
+    //< The specified fileDir must exist otherwise an error will be returend when calling \r CBL_Init().
+    pub temp_directory: &'static CStr, //< The directory where the SQLite stores its temporary files.
+                                       //< Normally the path returned from Android Context's getExternalFilesDir(String type) with a custom type such as "CBLTemp" can be specified here
+                                       //< unless different directory is desired. The specified tempDir must exist otherwise an error will be returend when calling \r CBL_Init().
+}
+
+/** Initialize application context information for Android application. This function is required
+   to be called the first time before using the CouchbaseLite library otherwise an error will be
+   returned when calling CBLDatabase_Open to open a database. Call \r CBL_Init more than once will
+   return an error.
+   @param context  The application context information.
+*/
+#[cfg(target_os = "android")]
+pub fn android_init(context: AndroidInitContext) -> Result<()> {
+    let mut err = CBLError::default();
+    unsafe {
+        CBL_Init(
+            CBLInitContext {
+                filesDir: context.files_directory.as_ptr(),
+                tempDir: context.temp_directory.as_ptr(),
+            },
+            &mut err,
+        );
+    }
+    check_error(&err)
 }
