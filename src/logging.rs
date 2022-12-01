@@ -31,7 +31,8 @@ enum_from_primitive! {
         Database,
         Query,
         Replicator,
-        Network
+        Network,
+        None
     }
 }
 
@@ -149,8 +150,8 @@ unsafe extern "C" fn invoke_log_callback(
     msg: FLString,
 ) {
     if let Some(cb) = LOG_CALLBACK {
-        let domain = Domain::from_u8(c_domain).unwrap();
-        let level = Level::from_u8(c_level).unwrap();
-        cb(domain, level, msg.as_str().unwrap());
+        let domain = Domain::from_u8(c_domain).unwrap_or(Domain::None);
+        let level = Level::from_u8(c_level).unwrap_or(Level::None);
+        cb(domain, level, msg.as_str().unwrap_or("Empty error"));
     }
 }
