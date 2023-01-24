@@ -364,7 +364,8 @@ pub extern "C" fn c_property_encryptor(
                     Err(_) => {
                         error!("Encryption callback returned with error");
                         error = Error::cbl_error(CouchbaseLiteError::Crypto);
-                        FLSliceResult_New(0)
+
+                        FLSliceResult::null()
                     }
                 });
         } else {
@@ -427,7 +428,8 @@ pub extern "C" fn c_property_decryptor(
                     Err(_) => {
                         error!("Decryption callback returned with error");
                         error = Error::cbl_error(CouchbaseLiteError::Crypto);
-                        FLSliceResult_New(0)
+
+                        FLSliceResult::null()
                     }
                 });
         } else {

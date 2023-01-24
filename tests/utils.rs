@@ -145,6 +145,9 @@ pub fn with_three_dbs<F>(
     let mut central_db = Database::open("central", Some(cfg3)).expect("open db central");
     assert!(Database::exists("central", tmp_dir.path()));
 
+    let repl1_continuous = config1.continuous;
+    let repl2_continuous = config2.continuous;
+
     // Create replicators
     let config1 = generate_replication_configuration(&local_db1, &central_db, config1);
     let mut repl1 = Replicator::new(config1, context1).unwrap();
@@ -153,8 +156,12 @@ pub fn with_three_dbs<F>(
     let mut repl2 = Replicator::new(config2, context2).unwrap();
 
     // Start replicators
-    repl1.start(false);
-    repl2.start(false);
+    if repl1_continuous {
+        repl1.start(false);
+    }
+    if repl2_continuous {
+        repl2.start(false);
+    }
 
     // Callback
     f(
@@ -166,8 +173,12 @@ pub fn with_three_dbs<F>(
     );
 
     // Clean up
-    assert!(repl1.stop());
-    assert!(repl2.stop());
+    if repl1_continuous {
+        assert!(repl1.stop());
+    }
+    if repl2_continuous {
+        assert!(repl2.stop());
+    }
 
     local_db1.delete().unwrap();
     local_db2.delete().unwrap();

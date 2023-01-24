@@ -17,7 +17,7 @@
 
 use crate::{
     CblRef,
-    c_api::{FLSlice, FLSliceResult, _FLBuf_Release, _FLBuf_Retain, FLData_Dump},
+    c_api::{FLSlice, FLSlice_Copy, FLSliceResult, _FLBuf_Release, _FLBuf_Retain, FLData_Dump},
 };
 
 use std::borrow::Cow;
@@ -161,6 +161,14 @@ impl std::ops::Not for FLSlice {
 }
 
 impl FLSliceResult {
+    pub fn null() -> FLSliceResult {
+        let s = FLSlice {
+            buf: ptr::null(),
+            size: 0,
+        };
+        unsafe { FLSlice_Copy(s) }
+    }
+
     pub const fn as_slice(&self) -> FLSlice {
         FLSlice {
             buf: self.buf,

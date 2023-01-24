@@ -20,7 +20,7 @@ extern crate lazy_static;
 
 use self::couchbase_lite::*;
 use encryptable::Encryptable;
-use std::time::Duration;
+use std::{time::Duration, thread};
 
 pub mod utils;
 
@@ -525,9 +525,31 @@ fn decryptor(
 ) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
     Ok(input.iter().map(|u| u ^ 48).collect())
 }
+fn encryptor_err(
+    _document_id: Option<String>,
+    _properties: Dict,
+    _key_path: Option<String>,
+    _: Vec<u8>,
+    _algorithm: Option<String>,
+    _kid: Option<String>,
+    _error: &Error,
+) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+    Err("".into())
+}
+fn decryptor_err(
+    _document_id: Option<String>,
+    _properties: Dict,
+    _key_path: Option<String>,
+    _: Vec<u8>,
+    _algorithm: Option<String>,
+    _kid: Option<String>,
+    _error: &Error,
+) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+    Err("".into())
+}
 
 #[test]
-fn encryption_decryption() {
+fn encryption_ok_decryption_ok() {
     let config1 = utils::ReplicationTestConfiguration::default();
     let config2 = utils::ReplicationTestConfiguration::default();
 
@@ -569,7 +591,7 @@ fn encryption_decryption() {
                     .expect("save");
             }
 
-            // Check foo is replicated with data encrypted in central
+            // Check document is replicated with data encrypted in central
             assert!(utils::check_callback_with_wait(
                 || central_db.get_document("foo").is_ok(),
                 None
@@ -580,7 +602,7 @@ fn encryption_decryption() {
                 assert!(dict.to_keys_hash_set().get("encrypted$s").is_some());
             }
 
-            // Check foo is replicated with data decrypted in DB 2
+            // Check document is replicated with data decrypted in DB 2
             assert!(utils::check_callback_with_wait(
                 || local_db2.get_document("foo").is_ok(),
                 None
@@ -594,6 +616,143 @@ fn encryption_decryption() {
                 assert!(encryptable.get_value().as_string() == Some("test_encryption"));
                 drop(encryptable);
             }
+        },
+    );
+}
+
+#[test]
+fn encryption_error() {
+    let config1 = utils::ReplicationTestConfiguration {
+        continuous: false,
+        ..Default::default()
+    };
+    let config2 = utils::ReplicationTestConfiguration::default();
+
+    let context1 = ReplicationConfigurationContext {
+        push_filter: None,
+        pull_filter: None,
+        conflict_resolver: None,
+        property_encryptor: Some(encryptor_err),
+        property_decryptor: Some(decryptor),
+    };
+
+    let context2 = ReplicationConfigurationContext {
+        push_filter: None,
+        pull_filter: None,
+        conflict_resolver: None,
+        property_encryptor: Some(encryptor),
+        property_decryptor: Some(decryptor),
+    };
+
+    utils::with_three_dbs(
+        config1,
+        config2,
+        Box::new(context1),
+        Box::new(context2),
+        |local_db1, _local_db2, central_db, repl1, _repl2| {
+            // Save doc 'foo' with an encryptable property
+            {
+                let mut doc_db1 = Document::new_with_id("foo");
+                let mut props = doc_db1.mutable_properties();
+                props.at("i").put_i64(1234);
+                props
+                    .at("s")
+                    .put_encrypt(&Encryptable::create_with_string("test_encryption"));
+                local_db1
+                    .save_document_with_concurency_control(
+                        &mut doc_db1,
+                        ConcurrencyControl::FailOnConflict,
+                    )
+                    .expect("save");
+            }
+
+            // Manually trigger the replication
+            repl1.start(false);
+
+            // Check document is not replicated in central because of the encryption error
+            thread::sleep(Duration::from_secs(5));
+            assert!(central_db.get_document("foo").is_err());
+
+            // Manually trigger the replication
+            repl1.start(false); // the push will be retried even if 'reset_checkpoint = false'
+
+            // Check document is not replicated in central because of the encryption error
+            thread::sleep(Duration::from_secs(5));
+            assert!(central_db.get_document("foo").is_err());
+        },
+    );
+}
+
+#[test]
+fn decryption_error() {
+    let config1 = utils::ReplicationTestConfiguration::default();
+    let config2 = utils::ReplicationTestConfiguration {
+        continuous: false,
+        ..Default::default()
+    };
+
+    let context1 = ReplicationConfigurationContext {
+        push_filter: None,
+        pull_filter: None,
+        conflict_resolver: None,
+        property_encryptor: Some(encryptor),
+        property_decryptor: Some(decryptor),
+    };
+
+    let context2 = ReplicationConfigurationContext {
+        push_filter: None,
+        pull_filter: None,
+        conflict_resolver: None,
+        property_encryptor: Some(encryptor),
+        property_decryptor: Some(decryptor_err),
+    };
+
+    utils::with_three_dbs(
+        config1,
+        config2,
+        Box::new(context1),
+        Box::new(context2),
+        |local_db1, local_db2, central_db, _repl1, repl2| {
+            // Save doc 'foo' with an encryptable property
+            {
+                let mut doc = Document::new_with_id("foo");
+                let mut props = doc.mutable_properties();
+                props.at("i").put_i64(1234);
+                props
+                    .at("s")
+                    .put_encrypt(&Encryptable::create_with_string("test_encryption"));
+                local_db1
+                    .save_document_with_concurency_control(
+                        &mut doc,
+                        ConcurrencyControl::FailOnConflict,
+                    )
+                    .expect("save");
+            }
+
+            // Check document is replicated in central
+            assert!(utils::check_callback_with_wait(
+                || central_db.get_document("foo").is_ok(),
+                None
+            ));
+            {
+                let doc_central = central_db.get_document("foo").unwrap();
+                let dict = doc_central.properties();
+                assert!(dict.to_keys_hash_set().get("encrypted$s").is_some());
+            }
+
+            // Manually trigger the replication
+            repl2.start(false);
+
+            // Check document is not replicated in DB2 because of the decryption error
+            thread::sleep(Duration::from_secs(5));
+            assert!(local_db2.get_document("foo").is_err());
+
+            // Manually trigger the replication
+            repl2.start(true); // 'reset_checkpoint = true' will trigger a new decryption, else the document will not be pulled again
+
+            // Check document is not replicated in DB2 because of the decryption error
+            thread::sleep(Duration::from_secs(5));
+            assert!(local_db2.get_document("foo").is_err());
         },
     );
 }
