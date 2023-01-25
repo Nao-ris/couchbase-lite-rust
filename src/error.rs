@@ -21,6 +21,7 @@ use crate::c_api::{
     CBLError, CBLErrorDomain, CBLError_Message, FLError, kCBLDomain, kCBLFleeceDomain,
     kCBLNetworkDomain, kCBLPOSIXDomain, kCBLSQLiteDomain, kCBLWebSocketDomain,
 };
+use crate::error;
 use enum_primitive::FromPrimitive;
 use std::fmt;
 
@@ -194,7 +195,14 @@ impl Error {
                 return "Unknown error".to_string();
             }
         }
-        unsafe { CBLError_Message(&self.as_cbl_error()).to_string().unwrap() }
+        unsafe {
+            CBLError_Message(&self.as_cbl_error())
+                .to_string()
+                .unwrap_or_else(|| {
+                    error!("Generating the error message for error ({:?}) and internal info ({:?}) failed", self.code, self.internal_info);
+                    "Unknown error".to_string()
+                })
+        }
     }
 }
 
