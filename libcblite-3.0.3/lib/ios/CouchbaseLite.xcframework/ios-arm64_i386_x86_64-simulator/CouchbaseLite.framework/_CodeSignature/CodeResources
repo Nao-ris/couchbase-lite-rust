@@ -42,7 +42,7 @@
 		</data>
 		<key>Headers/CBLReplicator.h</key>
 		<data>
-		NYCxlHwONLKbnmX/Y8Ow69Al4Xc=
+		m0lQVzjFxWM71A7VUU2dF/nWa/A=
 		</data>
 		<key>Headers/CBL_Compat.h</key>
 		<data>
@@ -50,7 +50,7 @@
 		</data>
 		<key>Headers/CBL_Edition.h</key>
 		<data>
-		SSFO2/ORSXueWI6TfabLl5qtqEU=
+		nIL52uYX1K/mRo5/1TbppcFJ11k=
 		</data>
 		<key>Headers/CouchbaseLite.h</key>
 		<data>
@@ -70,7 +70,7 @@
 		</data>
 		<key>Info.plist</key>
 		<data>
-		pLIax8tf74gR8KuSyfyMtquhf8Y=
+		k7BZ3cm45X7U8gAfal599DpPx8o=
 		</data>
 		<key>Modules/module.modulemap</key>
 		<data>
@@ -182,11 +182,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			NYCxlHwONLKbnmX/Y8Ow69Al4Xc=
+			m0lQVzjFxWM71A7VUU2dF/nWa/A=
 			</data>
 			<key>hash2</key>
 			<data>
-			DN7as3OHZpoQYpVm5AhkAACVkjcx1RLAub/x6PWEM3U=
+			V8HL5AL6SaClx5hUal9GsOgYdVQQ2eqUpkF+iAvF3aE=
 			</data>
 		</dict>
 		<key>Headers/CBL_Compat.h</key>
@@ -204,11 +204,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			SSFO2/ORSXueWI6TfabLl5qtqEU=
+			nIL52uYX1K/mRo5/1TbppcFJ11k=
 			</data>
 			<key>hash2</key>
 			<data>
-			ouvzVRokJwybHKPfBAp9ui6KT/VBKFsrKimlI7SPUkY=
+			5n85daAzzv+CkvoFyNFtoaW2UQvGhHdiNNy35O2SoGg=
 			</data>
 		</dict>
 		<key>Headers/CouchbaseLite.h</key>
