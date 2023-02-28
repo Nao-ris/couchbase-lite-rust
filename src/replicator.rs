@@ -24,8 +24,8 @@ use std::{
     time::Duration,
 };
 use crate::{
-    CblRef, CouchbaseLiteError, Database, Dict, Document, Error, ListenerToken, MutableDict,
-    Result, check_error, release, retain,
+    CblRef, CouchbaseLiteError, Database, Dict, Document, Error, ErrorCode, ListenerToken,
+    MutableDict, Result, check_error, release, retain,
     slice::{from_str, from_bytes, self},
     c_api::{
         CBLListener_Remove, CBLAuth_CreatePassword, CBLAuth_CreateSession, CBLAuthenticator,
@@ -363,7 +363,10 @@ pub extern "C" fn c_property_encryptor(
                     Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
                     Err(_) => {
                         error!("Encryption callback returned with error");
-                        error = Error::cbl_error(CouchbaseLiteError::Crypto);
+                        error = Error {
+                            code: ErrorCode::WebSocket(503),
+                            internal_info: None,
+                        };
 
                         FLSliceResult::null()
                     }
@@ -427,7 +430,10 @@ pub extern "C" fn c_property_decryptor(
                     Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
                     Err(_) => {
                         error!("Decryption callback returned with error");
-                        error = Error::cbl_error(CouchbaseLiteError::Crypto);
+                        error = Error {
+                            code: ErrorCode::WebSocket(503),
+                            internal_info: None,
+                        };
 
                         FLSliceResult::null()
                     }

@@ -73,6 +73,7 @@ where
 
 // Replication
 
+#[derive(Clone)]
 pub struct ReplicationTestConfiguration {
     pub replicator_type: ReplicatorType,
     pub continuous: bool,
@@ -113,76 +114,297 @@ fn generate_replication_configuration(
     }
 }
 
-pub fn with_three_dbs<F>(
-    config1: ReplicationTestConfiguration,
-    config2: ReplicationTestConfiguration,
-    context1: Box<ReplicationConfigurationContext>,
-    context2: Box<ReplicationConfigurationContext>,
-    f: F,
-) where
-    F: Fn(&mut Database, &mut Database, &mut Database, &mut Replicator, &mut Replicator),
-{
-    init_logging();
+pub struct ReplicationTwoDbsTester {
+    _tmp_dir: TempDir,
+    pub local_database: Database,
+    central_database: Database,
+    replicator: Replicator,
+    replicator_continuous: bool,
+}
 
-    // Create databases
-    let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
-    let cfg1 = DatabaseConfiguration {
-        directory: tmp_dir.path(),
-        encryption_key: None,
-    };
-    let cfg2 = DatabaseConfiguration {
-        directory: tmp_dir.path(),
-        encryption_key: None,
-    };
-    let cfg3 = DatabaseConfiguration {
-        directory: tmp_dir.path(),
-        encryption_key: None,
-    };
-    let mut local_db1 = Database::open("local1", Some(cfg1)).expect("open db local1");
-    assert!(Database::exists("local1", tmp_dir.path()));
-    let mut local_db2 = Database::open("local2", Some(cfg2)).expect("open db local2");
-    assert!(Database::exists("local2", tmp_dir.path()));
-    let mut central_db = Database::open("central", Some(cfg3)).expect("open db central");
-    assert!(Database::exists("central", tmp_dir.path()));
+impl ReplicationTwoDbsTester {
+    pub fn new(
+        replication_configuration: ReplicationTestConfiguration,
+        context: Box<ReplicationConfigurationContext>,
+    ) -> Self {
+        init_logging();
 
-    let repl1_continuous = config1.continuous;
-    let repl2_continuous = config2.continuous;
+        // Create databases
+        let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
+        let tmp_dir_path = tmp_dir.path();
+        let local_database_configuration = DatabaseConfiguration {
+            directory: tmp_dir_path,
+            encryption_key: None,
+        };
+        let central_database_configuration = DatabaseConfiguration {
+            directory: tmp_dir_path,
+            encryption_key: None,
+        };
 
-    // Create replicators
-    let config1 = generate_replication_configuration(&local_db1, &central_db, config1);
-    let mut repl1 = Replicator::new(config1, context1).unwrap();
+        let local_database =
+            Database::open("local", Some(local_database_configuration)).expect("open db local");
+        assert!(Database::exists("local", tmp_dir_path));
+        let central_database = Database::open("central", Some(central_database_configuration))
+            .expect("open db central");
+        assert!(Database::exists("central", tmp_dir_path));
 
-    let config2 = generate_replication_configuration(&local_db2, &central_db, config2);
-    let mut repl2 = Replicator::new(config2, context2).unwrap();
+        let replicator_continuous = replication_configuration.continuous;
 
-    // Start replicators
-    if repl1_continuous {
-        repl1.start(false);
-    }
-    if repl2_continuous {
-        repl2.start(false);
-    }
+        // Create replicator
+        let replication_configuration = generate_replication_configuration(
+            &local_database,
+            &central_database,
+            replication_configuration,
+        );
+        let mut replicator = Replicator::new(replication_configuration, context).unwrap();
 
-    // Callback
-    f(
-        &mut local_db1,
-        &mut local_db2,
-        &mut central_db,
-        &mut repl1,
-        &mut repl2,
-    );
+        // Start replicator if needed
+        if replicator_continuous {
+            replicator.start(false);
+        }
 
-    // Clean up
-    if repl1_continuous {
-        assert!(repl1.stop());
-    }
-    if repl2_continuous {
-        assert!(repl2.stop());
+        // Return
+        Self {
+            _tmp_dir: tmp_dir,
+            local_database,
+            central_database,
+            replicator,
+            replicator_continuous,
+        }
     }
 
-    local_db1.delete().unwrap();
-    local_db2.delete().unwrap();
-    central_db.delete().unwrap();
+    pub fn test<F>(&mut self, f: F)
+    where
+        F: Fn(&mut Database, &mut Database, &mut Replicator),
+    {
+        f(
+            &mut self.local_database,
+            &mut self.central_database,
+            &mut self.replicator,
+        );
+    }
+
+    pub fn start_replicator(&mut self) {
+        self.replicator.start(false);
+    }
+
+    pub fn stop_replicator(&mut self) {
+        if self.replicator_continuous {
+            assert!(self.replicator.stop());
+        }
+    }
+
+    fn new_replicator(
+        &mut self,
+        new_configuration: ReplicationTestConfiguration,
+        new_context: Box<ReplicationConfigurationContext>,
+    ) -> Replicator {
+        let replicator_continuous = new_configuration.continuous;
+
+        let new_configuration = generate_replication_configuration(
+            &self.local_database,
+            &self.central_database,
+            new_configuration,
+        );
+        let mut new_replicator = Replicator::new(new_configuration, new_context).unwrap();
+
+        if replicator_continuous {
+            new_replicator.start(false);
+        }
+
+        new_replicator
+    }
+    pub fn change_replicator(
+        &mut self,
+        new_configuration: ReplicationTestConfiguration,
+        new_context: Box<ReplicationConfigurationContext>,
+    ) {
+        self.stop_replicator();
+        self.replicator_continuous = new_configuration.continuous;
+        self.replicator = self.new_replicator(new_configuration, new_context);
+    }
+}
+
+impl Drop for ReplicationTwoDbsTester {
+    fn drop(&mut self) {
+        self.stop_replicator();
+
+        self.local_database.clone().delete().unwrap();
+        self.central_database.clone().delete().unwrap();
+    }
+}
+
+pub struct ReplicationThreeDbsTester {
+    _tmp_dir: TempDir,
+    local_database_1: Database,
+    local_database_2: Database,
+    central_database: Database,
+    replicator_1: Replicator,
+    replicator_1_continuous: bool,
+    replicator_2: Replicator,
+    replicator_2_continuous: bool,
+}
+
+impl ReplicationThreeDbsTester {
+    pub fn new(
+        replication_configuration_1: ReplicationTestConfiguration,
+        replication_configuration_2: ReplicationTestConfiguration,
+        context_1: Box<ReplicationConfigurationContext>,
+        context_2: Box<ReplicationConfigurationContext>,
+    ) -> Self {
+        init_logging();
+
+        // Create databases
+        let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
+        let local_database_1_configuration = DatabaseConfiguration {
+            directory: tmp_dir.path(),
+            encryption_key: None,
+        };
+        let local_database_2_configuration = DatabaseConfiguration {
+            directory: tmp_dir.path(),
+            encryption_key: None,
+        };
+        let central_database_configuration = DatabaseConfiguration {
+            directory: tmp_dir.path(),
+            encryption_key: None,
+        };
+
+        let local_database_1 =
+            Database::open("local1", Some(local_database_1_configuration)).expect("open db local1");
+        assert!(Database::exists("local1", tmp_dir.path()));
+        let local_database_2 =
+            Database::open("local2", Some(local_database_2_configuration)).expect("open db local2");
+        assert!(Database::exists("local2", tmp_dir.path()));
+        let central_database = Database::open("central", Some(central_database_configuration))
+            .expect("open db central");
+        assert!(Database::exists("central", tmp_dir.path()));
+
+        let replicator_1_continuous = replication_configuration_1.continuous;
+        let replicator_2_continuous = replication_configuration_2.continuous;
+
+        // Create replicators
+        let replication_configuration_1 = generate_replication_configuration(
+            &local_database_1,
+            &central_database,
+            replication_configuration_1,
+        );
+        let mut replicator_1 = Replicator::new(replication_configuration_1, context_1).unwrap();
+
+        let replication_configuration_2 = generate_replication_configuration(
+            &local_database_2,
+            &central_database,
+            replication_configuration_2,
+        );
+        let mut replicator_2 = Replicator::new(replication_configuration_2, context_2).unwrap();
+
+        // Start replicators if needed
+        if replicator_1_continuous {
+            replicator_1.start(false);
+        }
+        if replicator_2_continuous {
+            replicator_2.start(false);
+        }
+
+        // Return
+        Self {
+            _tmp_dir: tmp_dir,
+            local_database_1,
+            local_database_2,
+            central_database,
+            replicator_1,
+            replicator_1_continuous,
+            replicator_2,
+            replicator_2_continuous,
+        }
+    }
+
+    pub fn test<F>(&mut self, f: F)
+    where
+        F: Fn(&mut Database, &mut Database, &mut Database, &mut Replicator, &mut Replicator),
+    {
+        f(
+            &mut self.local_database_1,
+            &mut self.local_database_2,
+            &mut self.central_database,
+            &mut self.replicator_1,
+            &mut self.replicator_2,
+        );
+    }
+
+    pub fn start_replicator_1(&mut self) {
+        self.replicator_1.start(false);
+    }
+    pub fn start_replicator_2(&mut self) {
+        self.replicator_2.start(false);
+    }
+    pub fn start_all_replicators(&mut self) {
+        self.start_replicator_1();
+        self.start_replicator_2();
+    }
+
+    pub fn stop_replicator_1(&mut self) {
+        if self.replicator_1_continuous {
+            assert!(self.replicator_1.stop());
+        }
+    }
+    pub fn stop_replicator_2(&mut self) {
+        if self.replicator_2_continuous {
+            assert!(self.replicator_2.stop());
+        }
+    }
+    pub fn stop_replicators(&mut self) {
+        self.stop_replicator_1();
+        self.stop_replicator_2();
+    }
+
+    fn new_replicator(
+        &mut self,
+        new_configuration: ReplicationTestConfiguration,
+        new_context: Box<ReplicationConfigurationContext>,
+    ) -> Replicator {
+        let replicator_continuous = new_configuration.continuous;
+
+        let new_configuration = generate_replication_configuration(
+            &self.local_database_1,
+            &self.central_database,
+            new_configuration,
+        );
+        let mut new_replicator = Replicator::new(new_configuration, new_context).unwrap();
+
+        if replicator_continuous {
+            new_replicator.start(false);
+        }
+
+        new_replicator
+    }
+    pub fn change_replicator_1(
+        &mut self,
+        new_configuration: ReplicationTestConfiguration,
+        new_context: Box<ReplicationConfigurationContext>,
+    ) {
+        self.stop_replicator_1();
+        self.replicator_1_continuous = new_configuration.continuous;
+        self.replicator_1 = self.new_replicator(new_configuration, new_context);
+    }
+    pub fn change_replicator_2(
+        &mut self,
+        new_configuration: ReplicationTestConfiguration,
+        new_context: Box<ReplicationConfigurationContext>,
+    ) {
+        self.stop_replicator_2();
+        self.replicator_2_continuous = new_configuration.continuous;
+        self.replicator_2 = self.new_replicator(new_configuration, new_context);
+    }
+}
+
+impl Drop for ReplicationThreeDbsTester {
+    fn drop(&mut self) {
+        self.stop_replicators();
+
+        self.local_database_1.clone().delete().unwrap();
+        self.local_database_2.clone().delete().unwrap();
+        self.central_database.clone().delete().unwrap();
+    }
 }
 
 pub fn add_doc(db: &mut Database, id: &str, i: i64, s: &str) {

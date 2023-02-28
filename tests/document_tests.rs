@@ -238,58 +238,43 @@ fn database_add_document_change_listener() {
 fn database_delete_document() {
     let (sender, receiver) = std::sync::mpsc::channel();
 
-    let config1 = utils::ReplicationTestConfiguration::default();
-    let config2 = utils::ReplicationTestConfiguration::default();
-
-    let context1 = ReplicationConfigurationContext {
+    let context = ReplicationConfigurationContext {
         push_filter: Some(Box::new(move |document, is_deleted, _is_access_removed| {
             if is_deleted && document.id() == "foo" {
                 sender.send(true).unwrap();
             }
             true
         })),
-        pull_filter: None,
-        conflict_resolver: None,
-        property_encryptor: None,
-        property_decryptor: None,
+        ..Default::default()
     };
-    let context2 = ReplicationConfigurationContext::default();
 
-    utils::with_three_dbs(
-        config1,
-        config2,
-        Box::new(context1),
-        Box::new(context2),
-        |local_db1, local_db2, central_db, _repl1, _repl2| {
-            // Save doc 'foo'
-            utils::add_doc(local_db1, "foo", 1234, "Hello World!");
-
-            // Check 'foo' is replicated to central and DB 2
-            assert!(utils::check_callback_with_wait(
-                || central_db.get_document("foo").is_ok(),
-                None
-            ));
-            assert!(utils::check_callback_with_wait(
-                || local_db2.get_document("foo").is_ok(),
-                None
-            ));
-
-            // Delete document in DB 1
-            let document = local_db1.get_document("foo").unwrap();
-            local_db1
-                .delete_document_with_concurency_control(
-                    &document,
-                    ConcurrencyControl::FailOnConflict,
-                )
-                .expect("delete_document");
-
-            let document = local_db1.get_document("foo").unwrap();
-            assert!(document.is_deleted());
-
-            // Check document is replicated with deleted flag
-            receiver.recv_timeout(Duration::from_secs(10)).unwrap();
-        },
+    let mut tester = utils::ReplicationTwoDbsTester::new(
+        utils::ReplicationTestConfiguration::default(),
+        Box::new(context),
     );
+
+    tester.test(|local_db, central_db, _| {
+        // Save doc 'foo'
+        utils::add_doc(local_db, "foo", 1234, "Hello World!");
+
+        // Check 'foo' is replicated to central and DB 2
+        assert!(utils::check_callback_with_wait(
+            || central_db.get_document("foo").is_ok(),
+            None
+        ));
+
+        // Delete document in DB 1
+        let document = local_db.get_document("foo").unwrap();
+        local_db
+            .delete_document_with_concurency_control(&document, ConcurrencyControl::FailOnConflict)
+            .expect("delete_document");
+
+        let document = local_db.get_document("foo").unwrap();
+        assert!(document.is_deleted());
+
+        // Check document is replicated with deleted flag
+        receiver.recv_timeout(Duration::from_secs(10)).unwrap();
+    });
 }
 
 #[test]
