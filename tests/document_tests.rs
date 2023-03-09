@@ -1,6 +1,5 @@
 extern crate core;
 extern crate couchbase_lite;
-extern crate lazy_static;
 
 use self::couchbase_lite::*;
 use std::time::Duration;

@@ -359,13 +359,14 @@ impl ReplicationThreeDbsTester {
 
     fn new_replicator(
         &mut self,
+        local_database: Database,
         new_configuration: ReplicationTestConfiguration,
         new_context: Box<ReplicationConfigurationContext>,
     ) -> Replicator {
         let replicator_continuous = new_configuration.continuous;
 
         let new_configuration = generate_replication_configuration(
-            &self.local_database_1,
+            &local_database,
             &self.central_database,
             new_configuration,
         );
@@ -384,7 +385,11 @@ impl ReplicationThreeDbsTester {
     ) {
         self.stop_replicator_1();
         self.replicator_1_continuous = new_configuration.continuous;
-        self.replicator_1 = self.new_replicator(new_configuration, new_context);
+        self.replicator_1 = self.new_replicator(
+            self.local_database_1.clone(),
+            new_configuration,
+            new_context,
+        );
     }
     pub fn change_replicator_2(
         &mut self,
@@ -393,7 +398,11 @@ impl ReplicationThreeDbsTester {
     ) {
         self.stop_replicator_2();
         self.replicator_2_continuous = new_configuration.continuous;
-        self.replicator_2 = self.new_replicator(new_configuration, new_context);
+        self.replicator_2 = self.new_replicator(
+            self.local_database_2.clone(),
+            new_configuration,
+            new_context,
+        );
     }
 }
 
