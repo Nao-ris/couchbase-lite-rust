@@ -603,7 +603,7 @@ impl Replicator {
             let (sender, receiver) = channel();
             let callback: ReplicatorChangeListener = Box::new(move |status| {
                 if status.activity == ReplicatorActivityLevel::Stopped {
-                    sender.send(true).unwrap();
+                    let _ = sender.send(true);
                 }
             });
 
@@ -613,8 +613,11 @@ impl Replicator {
                 std::mem::transmute(&callback),
             );
 
-            CBLReplicator_Stop(self.get_ref());
-            let success = receiver.recv_timeout(Duration::from_secs(10)).is_ok();
+            let mut success = true;
+            if self.status().activity != ReplicatorActivityLevel::Stopped {
+                CBLReplicator_Stop(self.get_ref());
+                success = receiver.recv_timeout(Duration::from_secs(10)).is_ok();
+            }
             CBLListener_Remove(token);
             success
         }
