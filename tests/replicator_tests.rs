@@ -268,7 +268,7 @@ fn conflict_resolver() {
         ));
 
         // Stop replication on DB 1
-        repl1.stop();
+        repl1.stop(None);
 
         // Modify 'foo' in DB 1
         let mut foo = local_db1.get_document("foo").unwrap();
@@ -338,7 +338,7 @@ fn conflict_resolver_save_keep_local() {
         ));
 
         // Stop replication on DB 1
-        repl.stop();
+        repl.stop(None);
 
         // Modify 'foo' in central
         let mut foo = central_db.get_document("foo").unwrap();
@@ -419,7 +419,7 @@ fn conflict_resolver_save_keep_remote() {
         ));
 
         // Stop replication on DB 1
-        repl.stop();
+        repl.stop(None);
 
         // Modify 'foo' in central
         let mut foo = central_db.get_document("foo").unwrap();
