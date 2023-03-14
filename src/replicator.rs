@@ -603,7 +603,9 @@ impl Replicator {
             let (sender, receiver) = channel();
             let callback: ReplicatorChangeListener = Box::new(move |status| {
                 if status.activity == ReplicatorActivityLevel::Stopped {
+                    println!("Before Sender send true to status.activity == ReplicatorActivityLevel::Stopped");
                     sender.send(true).unwrap();
+                    println!("After Sender send true to status.activity == ReplicatorActivityLevel::Stopped");
                 }
             });
 
