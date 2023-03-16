@@ -652,7 +652,7 @@ fn encryption_error() {
 }
 
 #[test]
-fn decryption_error_one_local_db() {
+fn decryption_error() {
     let config = utils::ReplicationTestConfiguration {
         continuous: false,
         ..Default::default()
@@ -710,84 +710,6 @@ fn decryption_error_one_local_db() {
             || local_db.get_document("foo").is_ok(),
             None
         ));
-    });
-}
-
-#[test]
-fn decryption_error_two_local_dbs() {
-    let config2 = utils::ReplicationTestConfiguration {
-        continuous: false,
-        ..Default::default()
-    };
-
-    let context1 = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor),
-        ..Default::default()
-    };
-
-    let context2 = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor_err),
-        ..Default::default()
-    };
-
-    let mut tester = utils::ReplicationThreeDbsTester::new(
-        utils::ReplicationTestConfiguration::default(),
-        config2.clone(),
-        Box::new(context1),
-        Box::new(context2),
-    );
-
-    tester.test(|local_db1, local_db2, central_db, _, repl2| {
-        // Save doc 'foo' with an encryptable property
-        {
-            let mut doc = Document::new_with_id("foo");
-            let mut props = doc.mutable_properties();
-            props.at("i").put_i64(1234);
-            props
-                .at("s")
-                .put_encrypt(&Encryptable::create_with_string("test_encryption"));
-            local_db1
-                .save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
-                .expect("save");
-        }
-
-        // Check document is replicated in central
-        assert!(utils::check_callback_with_wait(
-            || central_db.get_document("foo").is_ok(),
-            None
-        ));
-        {
-            let doc_central = central_db.get_document("foo").unwrap();
-            let dict = doc_central.properties();
-            assert!(dict.to_keys_hash_set().get("encrypted$s").is_some());
-        }
-
-        // Manually trigger the replication
-        repl2.start(false);
-
-        // Check document is not replicated in DB2 because of the decryption error
-        thread::sleep(Duration::from_secs(5));
-        assert!(local_db2.get_document("foo").is_err());
-    });
-
-    // Change local DB 2 replicator to make the decryption work
-    let context2 = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor),
-        ..Default::default()
-    };
-
-    tester.change_replicator_2(config2, Box::new(context2));
-
-    tester.test(|_, local_db2, _, _, repl2| {
-        // Manually trigger the replication
-        repl2.start(false);
-
-        // Check document is now replicated in DB2
-        thread::sleep(Duration::from_secs(5));
-        assert!(local_db2.get_document("foo").is_ok());
     });
 }
 
