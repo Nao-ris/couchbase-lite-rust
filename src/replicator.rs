@@ -597,13 +597,15 @@ impl Replicator {
 
     /** Stops a running replicator, asynchronously. Does nothing if it's not already started.
     The replicator will call your \ref CBLReplicatorChangeListener with an activity level of
-    \ref kCBLReplicatorStopped after it stops. Until then, consider it still active. */
-    pub fn stop(&mut self) -> bool {
+    \ref kCBLReplicatorStopped after it stops. Until then, consider it still active.
+    The parameter timout_seconds has a default value of 10. */
+    pub fn stop(&mut self, timeout_seconds: Option<u64>) -> bool {
         unsafe {
+            let timeout_seconds = timeout_seconds.unwrap_or(10);
             let (sender, receiver) = channel();
             let callback: ReplicatorChangeListener = Box::new(move |status| {
                 if status.activity == ReplicatorActivityLevel::Stopped {
-                    sender.send(true).unwrap();
+                    let _ = sender.send(true);
                 }
             });
 
@@ -613,8 +615,13 @@ impl Replicator {
                 std::mem::transmute(&callback),
             );
 
-            CBLReplicator_Stop(self.get_ref());
-            let success = receiver.recv_timeout(Duration::from_secs(10)).is_ok();
+            let mut success = true;
+            if self.status().activity != ReplicatorActivityLevel::Stopped {
+                CBLReplicator_Stop(self.get_ref());
+                success = receiver
+                    .recv_timeout(Duration::from_secs(timeout_seconds))
+                    .is_ok();
+            }
             CBLListener_Remove(token);
             success
         }

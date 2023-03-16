@@ -190,7 +190,7 @@ impl ReplicationTwoDbsTester {
 
     pub fn stop_replicator(&mut self) {
         if self.replicator_continuous {
-            assert!(self.replicator.stop());
+            assert!(self.replicator.stop(None));
         }
     }
 
@@ -344,12 +344,12 @@ impl ReplicationThreeDbsTester {
 
     pub fn stop_replicator_1(&mut self) {
         if self.replicator_1_continuous {
-            assert!(self.replicator_1.stop());
+            assert!(self.replicator_1.stop(None));
         }
     }
     pub fn stop_replicator_2(&mut self) {
         if self.replicator_2_continuous {
-            assert!(self.replicator_2.stop());
+            assert!(self.replicator_2.stop(None));
         }
     }
     pub fn stop_replicators(&mut self) {
