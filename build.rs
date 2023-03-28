@@ -114,12 +114,12 @@ fn generate_bindings() -> Result<(), Box<dyn Error>> {
 
     let out_dir = env::var("OUT_DIR")?;
     bindings
-        .whitelist_type("CBL.*")
-        .whitelist_type("FL.*")
-        .whitelist_var("k?CBL.*")
-        .whitelist_var("k?FL.*")
-        .whitelist_function("CBL.*")
-        .whitelist_function("_?FL.*")
+        .allowlist_type("CBL.*")
+        .allowlist_type("FL.*")
+        .allowlist_var("k?CBL.*")
+        .allowlist_var("k?FL.*")
+        .allowlist_function("CBL.*")
+        .allowlist_function("_?FL.*")
         .no_copy("FLSliceResult")
         .size_t_is_usize(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))

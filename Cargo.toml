@@ -13,7 +13,7 @@ default-features = false # Disable features which are enabled by default
 features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt"]
 
 [build-dependencies]
-bindgen = "0.53.1"
+bindgen = "0.63"
 fs_extra = "1.2.0"
 
 [lib]
