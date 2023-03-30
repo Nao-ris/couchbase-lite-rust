@@ -31,8 +31,8 @@ fn logger(domain: logging::Domain, level: logging::Level, message: &str) {
 
 fn init_logging() {
     logging::set_callback(Some(logger));
-    logging::set_callback_level(logging::Level::Verbose);
-    logging::set_console_level(logging::Level::None);
+    logging::set_callback_level(logging::Level::Debug);
+    logging::set_console_level(logging::Level::Debug);
 }
 
 // Test wrapper function -- takes care of creating and deleting the database.
