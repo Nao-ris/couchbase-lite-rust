@@ -487,7 +487,7 @@ fn encryptor(
     _algorithm: Option<String>,
     _kid: Option<String>,
     _error: &Error,
-) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> std::result::Result<Vec<u8>, EncryptionError> {
     Ok(input.iter().map(|u| u ^ 48).collect())
 }
 fn decryptor(
@@ -498,7 +498,7 @@ fn decryptor(
     _algorithm: Option<String>,
     _kid: Option<String>,
     _error: &Error,
-) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> std::result::Result<Vec<u8>, EncryptionError> {
     Ok(input.iter().map(|u| u ^ 48).collect())
 }
 fn encryptor_err(
@@ -509,8 +509,8 @@ fn encryptor_err(
     _algorithm: Option<String>,
     _kid: Option<String>,
     _error: &Error,
-) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
-    Err("".into())
+) -> std::result::Result<Vec<u8>, EncryptionError> {
+    Err(EncryptionError::Transient)
 }
 fn decryptor_err(
     _document_id: Option<String>,
@@ -520,8 +520,8 @@ fn decryptor_err(
     _algorithm: Option<String>,
     _kid: Option<String>,
     _error: &Error,
-) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
-    Err("".into())
+) -> std::result::Result<Vec<u8>, EncryptionError> {
+    Err(EncryptionError::Transient)
 }
 
 #[test]

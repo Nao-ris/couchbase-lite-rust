@@ -114,10 +114,7 @@ impl FLSlice {
         if !self {
             return None;
         }
-        return Some(std::slice::from_raw_parts(
-            self.buf.cast::<u8>(),
-            self.size as usize,
-        ));
+        return Some(std::slice::from_raw_parts(self.buf.cast::<u8>(), self.size));
     }
 
     pub(crate) unsafe fn as_str<'a>(&self) -> Option<&'a str> {
