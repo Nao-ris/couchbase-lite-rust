@@ -317,8 +317,8 @@ unsafe extern "C" fn c_replication_conflict_resolver(
 }
 
 pub enum EncryptionError {
-    Transient,
-    NotTransient,
+    Temporary, // The replicator will stop the replication when encountering this error, then restart and try encrypting/decrypting the document again
+    Permanent, // The replicator will bypass the document and not try encrypting/decrypting the document until a new revision is created
 }
 
 /** Callback that encrypts encryptable properties in documents pushed by the replicator.
@@ -368,14 +368,14 @@ pub extern "C" fn c_property_encryptor(
                     Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
                     Err(err) => {
                         match err {
-                            EncryptionError::Transient => {
+                            EncryptionError::Temporary => {
                                 error!("Encryption callback returned with transient error");
                                 error = Error {
                                     code: ErrorCode::WebSocket(503),
                                     internal_info: None,
                                 };
                             }
-                            EncryptionError::NotTransient => {
+                            EncryptionError::Permanent => {
                                 error!("Encryption callback returned with non transient error");
                                 error = Error::cbl_error(CouchbaseLiteError::Crypto);
                             }
@@ -443,14 +443,14 @@ pub extern "C" fn c_property_decryptor(
                     Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
                     Err(err) => {
                         match err {
-                            EncryptionError::Transient => {
+                            EncryptionError::Temporary => {
                                 error!("Decryption callback returned with transient error");
                                 error = Error {
                                     code: ErrorCode::WebSocket(503),
                                     internal_info: None,
                                 };
                             }
-                            EncryptionError::NotTransient => {
+                            EncryptionError::Permanent => {
                                 error!("Decryption callback returned with non transient error");
                                 error = Error::cbl_error(CouchbaseLiteError::Crypto);
                             }
