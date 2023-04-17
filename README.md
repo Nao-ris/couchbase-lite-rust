@@ -74,6 +74,11 @@ number increases. That works only if a single test runs at a time.
 
     $ LSAN_OPTIONS=suppressions=san.supp RUSTFLAGS="-Zsanitizer=address" cargo +nightly test --verbose --features=flaky-test flaky
 
+### 7. Strip libraries
+```
+DOCKER_BUILDKIT=1 docker build --file Dockerfile -t strip --output libcblite .
+```
+
 ## Learning
 
 I've copied the doc-comments from the C API into the Rust files. But Couchbase Lite is fairly
