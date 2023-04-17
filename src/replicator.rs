@@ -316,6 +316,11 @@ unsafe extern "C" fn c_replication_conflict_resolver(
         })
 }
 
+pub enum EncryptionError {
+    Temporary, // The replicator will stop the replication when encountering this error, then restart and try encrypting/decrypting the document again
+    Permanent, // The replicator will bypass the document and not try encrypting/decrypting the document until a new revision is created
+}
+
 /** Callback that encrypts encryptable properties in documents pushed by the replicator.
 \note   If a null result or an error is returned, the document will be failed to
         replicate with the kCBLErrorCrypto error. For security reason, the encryption
@@ -328,7 +333,7 @@ pub type PropertyEncryptor = fn(
     algorithm: Option<String>,
     kid: Option<String>,
     error: &Error,
-) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>>;
+) -> std::result::Result<Vec<u8>, EncryptionError>;
 #[no_mangle]
 pub extern "C" fn c_property_encryptor(
     context: *mut ::std::os::raw::c_void,
@@ -361,12 +366,20 @@ pub extern "C" fn c_property_encryptor(
                 })
                 .map_or(FLSliceResult_New(0), |v| match v {
                     Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
-                    Err(_) => {
-                        error!("Encryption callback returned with error");
-                        error = Error {
-                            code: ErrorCode::WebSocket(503),
-                            internal_info: None,
-                        };
+                    Err(err) => {
+                        match err {
+                            EncryptionError::Temporary => {
+                                error!("Encryption callback returned with transient error");
+                                error = Error {
+                                    code: ErrorCode::WebSocket(503),
+                                    internal_info: None,
+                                };
+                            }
+                            EncryptionError::Permanent => {
+                                error!("Encryption callback returned with non transient error");
+                                error = Error::cbl_error(CouchbaseLiteError::Crypto);
+                            }
+                        }
 
                         FLSliceResult::null()
                     }
@@ -395,7 +408,7 @@ pub type PropertyDecryptor = fn(
     algorithm: Option<String>,
     kid: Option<String>,
     error: &Error,
-) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>>;
+) -> std::result::Result<Vec<u8>, EncryptionError>;
 #[no_mangle]
 pub extern "C" fn c_property_decryptor(
     context: *mut ::std::os::raw::c_void,
@@ -428,12 +441,20 @@ pub extern "C" fn c_property_decryptor(
                 })
                 .map_or(FLSliceResult_New(0), |v| match v {
                     Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
-                    Err(_) => {
-                        error!("Decryption callback returned with error");
-                        error = Error {
-                            code: ErrorCode::WebSocket(503),
-                            internal_info: None,
-                        };
+                    Err(err) => {
+                        match err {
+                            EncryptionError::Temporary => {
+                                error!("Decryption callback returned with transient error");
+                                error = Error {
+                                    code: ErrorCode::WebSocket(503),
+                                    internal_info: None,
+                                };
+                            }
+                            EncryptionError::Permanent => {
+                                error!("Decryption callback returned with non transient error");
+                                error = Error::cbl_error(CouchbaseLiteError::Crypto);
+                            }
+                        }
 
                         FLSliceResult::null()
                     }
