@@ -31,7 +31,7 @@ Place your terminal to the root of this repo, then follow the instructions below
 Run Docker:
     ``$ docker run --rm  --platform linux/amd64 -it -v $(PWD):/build archlinux``
 Install strip:
-    $ pacman -Sy base-devel
+    ``$ pacman -Sy base-devel``
 Strip:
     $ cd /build/libcblite-3.0.3/lib/x86_64-linux-android
     $ strip libcblite.so -o libcblite.stripped.so
