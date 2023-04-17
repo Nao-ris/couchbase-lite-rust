@@ -33,7 +33,7 @@ Run Docker:
 Install strip:
     ``$ pacman -Sy base-devel``
 Strip:
-    $ cd /build/libcblite-3.0.3/lib/x86_64-linux-android
+    ``$ cd /build/libcblite-3.0.3/lib/x86_64-linux-android
     $ strip libcblite.so -o libcblite.stripped.so
     $ cd /build/libcblite-3.0.3/lib/i686-linux-android
     $ strip libcblite.so -o libcblite.stripped.so
