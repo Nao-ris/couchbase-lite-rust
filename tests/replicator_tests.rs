@@ -795,6 +795,26 @@ fn encryption_error_permanent() {
             None
         ));
     });
+
+    tester.test(|local_db, central_db, repl| {
+        // Create new revision for document 'foo' in local
+        let mut doc = local_db.get_document("foo").unwrap();
+        let mut props = doc.mutable_properties();
+        props.at("i").put_i64(1235);
+
+        local_db
+            .save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
+            .expect("save");
+
+        // Manually trigger the replication
+        repl.start(false);
+
+        // Check document is replicated in central
+        assert!(utils::check_callback_with_wait(
+            || central_db.get_document("foo").is_ok(),
+            None
+        ));
+    });
 }
 
 #[test]
@@ -854,6 +874,26 @@ fn decryption_error_permanent() {
         // Check document is not replicated in local
         assert!(utils::check_callback_with_wait(
             || local_db.get_document("foo").is_err(),
+            None
+        ));
+    });
+
+    tester.test(|local_db, central_db, repl| {
+        // Create new revision for document 'foo' in central
+        let mut doc = central_db.get_document("foo").unwrap();
+        let mut props = doc.mutable_properties();
+        props.at("i").put_i64(1235);
+
+        central_db
+            .save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
+            .expect("save");
+
+        // Manually trigger the replication
+        repl.start(false);
+
+        // Check document is replicated in local
+        assert!(utils::check_callback_with_wait(
+            || local_db.get_document("foo").is_ok(),
             None
         ));
     });
