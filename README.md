@@ -39,7 +39,7 @@ Strip:
     $ strip libcblite.so -o libcblite.stripped.so``
 
 Run docker:
-    $ docker run --rm  --platform linux/arm64 -it -v $(PWD):/build debian
+    ``$ docker run --rm  --platform linux/arm64 -it -v $(PWD):/build debian``
 Install strip:
     $ apt update && apt install binutils -y
 Strip:
