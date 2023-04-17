@@ -46,7 +46,7 @@ Strip:
     ``$ cd /build/libcblite-3.0.3/lib/aarch64-linux-android
     $ strip libcblite.so -o libcblite.stripped.so
     $ cd /build/libcblite-3.0.3/lib/armv7-linux-androideabi
-    $ strip libcblite.so -o libcblite.stripped.so
+    $ strip libcblite.so -o libcblite.stripped.so``
 
 
 ### 3. Fix The Skanky Hardcoded Paths
