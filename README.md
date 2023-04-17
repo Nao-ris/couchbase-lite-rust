@@ -41,7 +41,7 @@ Strip:
 Run docker:
     ``$ docker run --rm  --platform linux/arm64 -it -v $(PWD):/build debian``
 Install strip:
-    $ apt update && apt install binutils -y
+    ``$ apt update && apt install binutils -y``
 Strip:
     $ cd /build/libcblite-3.0.3/lib/aarch64-linux-android
     $ strip libcblite.so -o libcblite.stripped.so
