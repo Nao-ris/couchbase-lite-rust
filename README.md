@@ -43,7 +43,7 @@ Run docker:
 Install strip:
     ``$ apt update && apt install binutils -y``
 Strip:
-    $ cd /build/libcblite-3.0.3/lib/aarch64-linux-android
+    ``$ cd /build/libcblite-3.0.3/lib/aarch64-linux-android
     $ strip libcblite.so -o libcblite.stripped.so
     $ cd /build/libcblite-3.0.3/lib/armv7-linux-androideabi
     $ strip libcblite.so -o libcblite.stripped.so
