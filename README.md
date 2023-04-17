@@ -29,7 +29,7 @@ For Android there is an extra step: stripping the libraries.
 Place your terminal to the root of this repo, then follow the instructions below.
 
 Run Docker:
-    $ docker run --rm  --platform linux/amd64 -it -v $(PWD):/build archlinux
+    ``$ docker run --rm  --platform linux/amd64 -it -v $(PWD):/build archlinux``
 Install strip:
     $ pacman -Sy base-devel
 Strip:
