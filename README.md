@@ -20,9 +20,34 @@ In addition to [Rust][RUST], you'll need to install LLVM and Clang, which are re
 [bindgen][BINDGEN] tool that generates Rust FFI APIs from C headers.
 Installation instructions are [here][BINDGEN_INSTALL].
 
-### 2. Get Couchbase Lite For C
+### 2. Couchbase Lite For C
 
-Next you need the Couchbase Lite For C shared library and headers. You can download them from Couchbase, or build them yourself from the [Git repo][CBL_C].
+The Couchbase Lite For C shared library and headers ([Git repo][CBL_C]) are already embedded in this repo.
+To upgrade the version, start by replacing all the necessary files in the folder libcblite-3.0.3
+
+For Android there is an extra step: stripping the libraries.
+Place your terminal to the root of this repo, then follow the instructions below.
+
+Run Docker:
+    $ docker run --rm  --platform linux/amd64 -it -v $(PWD):/build archlinux
+Install strip:
+    $ pacman -Sy base-devel
+Strip:
+    $ cd /build/libcblite-3.0.3/lib/x86_64-linux-android
+    $ strip libcblite.so -o libcblite.stripped.so
+    $ cd /build/libcblite-3.0.3/lib/i686-linux-android
+    $ strip libcblite.so -o libcblite.stripped.so
+
+Run docker:
+    $ docker run --rm  --platform linux/arm64 -it -v $(PWD):/build debian
+Install strip:
+    $ apt update && apt install binutils -y
+Strip:
+    $ cd /build/libcblite-3.0.3/lib/aarch64-linux-android
+    $ strip libcblite.so -o libcblite.stripped.so
+    $ cd /build/libcblite-3.0.3/lib/armv7-linux-androideabi
+    $ strip libcblite.so -o libcblite.stripped.so
+
 
 ### 3. Fix The Skanky Hardcoded Paths
 
