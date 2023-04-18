@@ -79,6 +79,34 @@ fn bindgen_for_mac(builder: bindgen::Builder) -> Result<bindgen::Builder, Box<dy
     Ok(builder.clang_arg(format!("-isysroot{}", sdk.trim())))
 }
 
+#[allow(dead_code)]
+enum OperatingSystem {
+    MacOs,
+    Windows,
+    Android,
+    IOs,
+}
+
+fn is_target(target: OperatingSystem) -> Result<bool, Box<dyn Error>> {
+    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    Ok(match target {
+        OperatingSystem::Android => target_os.contains("android"),
+        OperatingSystem::Windows => target_os.contains("windows"),
+        OperatingSystem::IOs => target_os.contains("apple-ios"),
+        OperatingSystem::MacOs => target_os.contains("apple-darwin"),
+    })
+}
+
+fn is_host(host: OperatingSystem) -> Result<bool, Box<dyn Error>> {
+    let host_os = env::var("HOST")?;
+    Ok(match host {
+        OperatingSystem::MacOs => host_os.contains("apple-darwin"),
+        OperatingSystem::Windows => host_os.contains("windows"),
+        OperatingSystem::Android => host_os.contains("android"),
+        OperatingSystem::IOs => host_os.contains("apple-ios"),
+    })
+}
+
 fn generate_bindings() -> Result<(), Box<dyn Error>> {
     let mut bindings = bindgen_for_mac(bindgen::Builder::default())?
         .header("src/wrapper.h")
@@ -94,7 +122,7 @@ fn generate_bindings() -> Result<(), Box<dyn Error>> {
     // /Applications/Xcode.app/.../Developer/SDKs/MacOSX10.15.sdk/usr/include/sys/cdefs.h:807:2: error: Unsupported architecture
     // /Applications/Xcode.app/.../Developer/SDKs/MacOSX10.15.sdk/usr/include/machine/_types.h:34:2: error: architecture not supported
     // FTR: https://github.com/rust-lang/rust-bindgen/issues/1780
-    if env::var("HOST")?.contains("apple") && env::var("CARGO_CFG_TARGET_OS")?.contains("android") {
+    if is_host(OperatingSystem::MacOs)? && is_target(OperatingSystem::Android)? {
         let ndk_sysroot = format!(
             "{}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot",
             env::var("NDK_HOME")?,
@@ -110,6 +138,22 @@ fn generate_bindings() -> Result<(), Box<dyn Error>> {
             .clang_arg(format!("-I{}/usr/include", ndk_sysroot))
             .clang_arg(format!("-I{}/usr/include/{}", ndk_sysroot, target_triplet))
             .clang_arg(format!("--target={}", target_triplet));
+    }
+
+    // Cross compiling from Mac to Windows
+    if is_host(OperatingSystem::MacOs)? && is_target(OperatingSystem::Windows)? {
+        let homebrew_prefix = Command::new("brew")
+            .arg("--prefix")
+            .arg("mingw-w64")
+            .output()?
+            .stdout;
+        let homebrew_prefix =
+            String::from_utf8_lossy(&homebrew_prefix[..homebrew_prefix.len() - 1]);
+        let mingw_path = format!("{homebrew_prefix}/toolchain-x86_64/x86_64-w64-mingw32");
+        let mingw_include_path = format!("{mingw_path}/include");
+        bindings = bindings
+            .clang_arg(format!("-I{}", mingw_include_path))
+            .clang_arg(format!("--target={}", "x86_64-pc-windows-gnu"));
     }
 
     let out_dir = env::var("OUT_DIR")?;
