@@ -316,7 +316,7 @@ unsafe extern "C" fn c_replication_conflict_resolver(
         })
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum EncryptionError {
     Temporary, // The replicator will stop the replication when encountering this error, then restart and try encrypting/decrypting the document again
     Permanent, // The replicator will bypass the document and not try encrypting/decrypting the document until a new revision is created
