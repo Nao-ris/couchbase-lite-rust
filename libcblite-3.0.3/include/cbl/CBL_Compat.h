@@ -35,11 +35,9 @@
     #define CBLINLINE               __forceinline
     #define _cbl_nonnull            _In_
     #define _cbl_warn_unused        _Check_return_
-    #define _cbl_deprecated
 #else
     #define CBLINLINE               inline
     #define _cbl_warn_unused        __attribute__((warn_unused_result))
-    #define _cbl_deprecated         __attribute__((deprecated()))
 #endif
 
 // Macros for defining typed enumerations and option flags.
@@ -48,6 +46,14 @@
 // To define an enumeration of option flags that will be ORed together:
 //      typedef CBL_OPTIONS(baseIntType, name) { ... };
 // These aren't just a convenience; they are required for Swift bindings.
+#if __has_attribute(enum_extensibility)
+#define __CBL_ENUM_ATTRIBUTES __attribute__((enum_extensibility(open)))
+#define __CBL_OPTIONS_ATTRIBUTES __attribute__((flag_enum,enum_extensibility(open)))
+#else
+#define __CBL_ENUM_ATTRIBUTES
+#define __CBL_OPTIONS_ATTRIBUTES
+#endif
+
 #if __APPLE__
     #include <CoreFoundation/CFBase.h>      /* for CF_ENUM and CF_OPTIONS macros */
     #define CBL_ENUM CF_ENUM
@@ -57,11 +63,11 @@
     #define CBL_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
 #else
     #if (__cplusplus && _MSC_VER) || (__cplusplus && __cplusplus >= 201103L && (__has_extension(cxx_strong_enums) || __has_feature(objc_fixed_enum))) || (!__cplusplus && __has_feature(objc_fixed_enum))
-        #define CBL_ENUM(_type, _name)     enum _name : _type _name; enum _name : _type
+        #define CBL_ENUM(_type, _name) int __CBL_ENUM_ ## _name; enum __CBL_ENUM_ATTRIBUTES _name : _type; typedef enum _name _name; enum _name : _type
         #if (__cplusplus)
-            #define CBL_OPTIONS(_type, _name) _type _name; enum : _type
+            #define CBL_OPTIONS(_type, _name) _type _name; enum __CBL_OPTIONS_ATTRIBUTES : _type
         #else
-            #define CBL_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
+            #define CBL_OPTIONS(_type, _name) int __CBL_OPTIONS_ ## _name; enum __CBL_OPTIONS_ATTRIBUTES _name : _type; typedef enum _name _name; enum _name : _type
         #endif
     #else
         #define CBL_ENUM(_type, _name) _type _name; enum
