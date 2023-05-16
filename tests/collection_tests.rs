@@ -352,3 +352,83 @@ fn collection_documents() {
         assert!(collection_3.get_document("foo").unwrap().is_deleted());
     });
 }
+
+#[test]
+fn queries() {
+    utils::with_db(|db| {
+        // Setup
+        {
+            let mut default_collection = db.default_collection().unwrap().unwrap();
+            let mut doc_1 = Document::new_with_id("foo");
+            doc_1
+                .set_properties_as_json(r#"{"foo":true,"bar":true}"#)
+                .expect("set_properties_as_json");
+            default_collection
+                .save_document(&mut doc_1)
+                .expect("save_document");
+
+            let mut collection_1 = db
+                .create_collection("collection_1".to_string(), DEFAULT_NAME.to_string())
+                .unwrap();
+            let mut doc_1 = Document::new_with_id("foo1");
+            doc_1
+                .set_properties_as_json(r#"{"foo":true,"bar":true}"#)
+                .expect("set_properties_as_json");
+            collection_1
+                .save_document(&mut doc_1)
+                .expect("save_document");
+
+            let mut collection_2 = db
+                .create_collection("collection_2".to_string(), "scope_1".to_string())
+                .unwrap();
+            let mut doc_2 = Document::new_with_id("foo2");
+            doc_2
+                .set_properties_as_json(r#"{"foo":true,"bar":true}"#)
+                .expect("set_properties_as_json");
+            collection_2
+                .save_document(&mut doc_2)
+                .expect("save_document");
+
+            let mut collection_3 = db
+                .create_collection("collection_3".to_string(), "scope_1".to_string())
+                .unwrap();
+            let mut doc_3 = Document::new_with_id("foo3");
+            doc_3
+                .set_properties_as_json(r#"{"foo":true,"bar":true}"#)
+                .expect("set_properties_as_json");
+            collection_3
+                .save_document(&mut doc_3)
+                .expect("save_document");
+        }
+
+        fn query(db: &mut Database, query: &str) -> Vec<String> {
+            let query = Query::new(db, QueryLanguage::N1QL, query).expect("create query");
+
+            let mut query_result = query.execute().expect("execute");
+
+            let mut results = vec![];
+            while let Some(row) = query_result.next() {
+                results.push(row.get(0).as_string().unwrap_or("").to_string());
+            }
+            results
+        }
+
+        assert_eq!(query(db, "SELECT _id FROM _"), vec!["foo".to_string()]); // Default collection
+        assert_eq!(
+            query(db, "SELECT _id FROM collection_1"),
+            vec!["foo1".to_string()]
+        ); // Collection must be in default scope with this query
+        assert_eq!(
+            query(db, "SELECT _id FROM _default.collection_1"),
+            vec!["foo1".to_string()]
+        );
+        assert_eq!(
+            query(db, "SELECT _id FROM scope_1.collection_2"),
+            vec!["foo2".to_string()]
+        );
+        assert_eq!(
+            query(db, "SELECT _id FROM scope_1.collection_3"),
+            vec!["foo3".to_string()]
+        );
+    });
+}
