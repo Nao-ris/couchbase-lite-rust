@@ -34,6 +34,7 @@
 extern crate enum_primitive;
 
 pub mod blob;
+pub mod collection;
 pub mod database;
 pub mod document;
 pub mod encryptable;

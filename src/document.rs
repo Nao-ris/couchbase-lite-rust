@@ -17,6 +17,11 @@
 
 use crate::{
     c_api::{
+        CBLCollection_DeleteDocument, CBLCollection_DeleteDocumentWithConcurrencyControl,
+        CBLCollection_GetDocumentExpiration, CBLCollection_GetMutableDocument,
+        CBLCollection_PurgeDocument, CBLCollection_PurgeDocumentByID, CBLCollection_SaveDocument,
+        CBLCollection_SaveDocumentWithConflictHandler,
+        CBLCollection_SaveDocumentWithConcurrencyControl, CBLCollection_SetDocumentExpiration,
         CBLDatabase, CBLDatabase_AddDocumentChangeListener, CBLDatabase_DeleteDocument,
         CBLDatabase_DeleteDocumentWithConcurrencyControl, CBLDatabase_GetDocumentExpiration,
         CBLDatabase_GetMutableDocument, CBLDatabase_PurgeDocument, CBLDatabase_PurgeDocumentByID,
@@ -31,6 +36,7 @@ use crate::{
     slice::from_str,
     CblRef, CouchbaseLiteError, Database, Dict, Error, ListenerToken, MutableDict, Result,
     Timestamp, check_bool, check_failure, failure, release, retain, Listener,
+    collection::Collection,
 };
 
 /** An in-memory copy of a document. */
@@ -275,6 +281,173 @@ impl Database {
                 )),
                 Box::from_raw(ptr),
             )
+        }
+    }
+}
+
+//////// COLLECTION'S DOCUMENT API:
+
+impl Collection {
+    /** Reads a document from the collection, creating a new (immutable) \ref CBLDocument object.
+    Each call to this function creates a new object (which must later be released.) */
+    pub fn get_document(&self, id: &str) -> Result<Document> {
+        unsafe {
+            // we always get a mutable CBLDocument,
+            // since Rust doesn't let us have MutableDocument subclass.
+            let mut error = CBLError::default();
+            let doc = CBLCollection_GetMutableDocument(
+                self.get_ref(),
+                from_str(id).get_ref(),
+                &mut error,
+            );
+            if doc.is_null() {
+                return if error.code == 0 {
+                    Err(Error::cbl_error(CouchbaseLiteError::NotFound))
+                } else {
+                    failure(error)
+                };
+            }
+            Ok(Document::wrap(doc))
+        }
+    }
+
+    /** Saves a (mutable) document to the collection. */
+    pub fn save_document(&mut self, doc: &mut Document) -> Result<()> {
+        unsafe {
+            check_bool(|error| CBLCollection_SaveDocument(self.get_ref(), doc.get_ref(), error))
+        }
+    }
+
+    /** Saves a (mutable) document to the collection.
+    If a conflicting revision has been saved since \p doc was loaded, the \p concurrency
+    parameter specifies whether the save should fail, or the conflicting revision should
+    be overwritten with the revision being saved.
+    If you need finer-grained control, call \ref CBLCollection_SaveDocumentWithConflictHandler instead.
+    @param collection  The collection to save to.
+    @param doc  The mutable document to save.
+    @param concurrency  Conflict-handling strategy (fail or overwrite).
+    @param outError  On failure, the error will be written here.
+    @return  True on success, false on failure. */
+    pub fn save_document_with_concurency_control(
+        &mut self,
+        doc: &mut Document,
+        concurrency: ConcurrencyControl,
+    ) -> Result<()> {
+        let c_concurrency = concurrency as u8;
+        unsafe {
+            check_bool(|error| {
+                CBLCollection_SaveDocumentWithConcurrencyControl(
+                    self.get_ref(),
+                    doc.get_ref(),
+                    c_concurrency,
+                    error,
+                )
+            })
+        }
+    }
+
+    /** Saves a (mutable) document to the collection, allowing for custom conflict handling in the event
+    that the document has been updated since \p doc was loaded. */
+    pub fn save_document_resolving(
+        &mut self,
+        doc: &mut Document,
+        conflict_handler: ConflictHandler,
+    ) -> Result<Document> {
+        unsafe {
+            let callback = conflict_handler as *mut std::ffi::c_void;
+            match check_bool(|error| {
+                CBLCollection_SaveDocumentWithConflictHandler(
+                    self.get_ref(),
+                    doc.get_ref(),
+                    Some(c_conflict_handler),
+                    callback,
+                    error,
+                )
+            }) {
+                Ok(_) => Ok(doc.clone()),
+                Err(err) => Err(err),
+            }
+        }
+    }
+
+    /** Deletes a document from the collection. Deletions are replicated. */
+    pub fn delete_document(&mut self, doc: &Document) -> Result<()> {
+        unsafe {
+            check_bool(|error| CBLCollection_DeleteDocument(self.get_ref(), doc.get_ref(), error))
+        }
+    }
+
+    /** Deletes a document from the collection. Deletions are replicated. */
+    pub fn delete_document_with_concurency_control(
+        &mut self,
+        doc: &Document,
+        concurrency: ConcurrencyControl,
+    ) -> Result<()> {
+        let c_concurrency = concurrency as u8;
+        unsafe {
+            check_bool(|error| {
+                CBLCollection_DeleteDocumentWithConcurrencyControl(
+                    self.get_ref(),
+                    doc.get_ref(),
+                    c_concurrency,
+                    error,
+                )
+            })
+        }
+    }
+
+    /** Purges a document. This removes all traces of the document from the collection.
+    Purges are _not_ replicated. If the document is changed on a server, it will be re-created
+    when pulled. */
+    pub fn purge_document(&mut self, doc: &Document) -> Result<()> {
+        unsafe {
+            check_bool(|error| CBLCollection_PurgeDocument(self.get_ref(), doc.get_ref(), error))
+        }
+    }
+
+    /** Purges a document, given only its ID. */
+    pub fn purge_document_by_id(&mut self, id: &str) -> Result<()> {
+        unsafe {
+            check_bool(|error| {
+                CBLCollection_PurgeDocumentByID(self.get_ref(), from_str(id).get_ref(), error)
+            })
+        }
+    }
+
+    /** Returns the time, if any, at which a given document will expire and be purged.
+    Documents don't normally expire; you have to call \ref CBLCollection_SetDocumentExpiration
+    to set a document's expiration time. */
+    pub fn document_expiration(&self, doc_id: &str) -> Result<Option<Timestamp>> {
+        unsafe {
+            let mut error = CBLError::default();
+            let exp = CBLCollection_GetDocumentExpiration(
+                self.get_ref(),
+                from_str(doc_id).get_ref(),
+                &mut error,
+            );
+            match exp {
+                0 => Ok(None),
+                _ if exp > 0 => Ok(Some(Timestamp(exp))),
+                _ => failure(error),
+            }
+        }
+    }
+
+    /** Sets or clears the expiration time of a document. */
+    pub fn set_document_expiration(&mut self, doc_id: &str, when: Option<Timestamp>) -> Result<()> {
+        let exp: i64 = match when {
+            Some(Timestamp(n)) => n,
+            _ => 0,
+        };
+        unsafe {
+            check_bool(|error| {
+                CBLCollection_SetDocumentExpiration(
+                    self.get_ref(),
+                    from_str(doc_id).get_ref(),
+                    exp,
+                    error,
+                )
+            })
         }
     }
 }
