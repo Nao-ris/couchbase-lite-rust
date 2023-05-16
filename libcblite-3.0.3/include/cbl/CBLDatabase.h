@@ -18,7 +18,6 @@
 
 #pragma once
 #include "CBLBase.h"
-#include "fleece/FLSlice.h"
 
 CBL_CAPI_BEGIN
 
@@ -72,6 +71,14 @@ CBLDatabaseConfiguration CBLDatabaseConfiguration_Default(void) CBLAPI;
     @param password  The input password, which can be any data.
     @return  True on success, false if there was a problem deriving the key. */
 bool CBLEncryptionKey_FromPassword(CBLEncryptionKey *key, FLString password) CBLAPI;
+
+/** VOLATILE API: Derives an encryption key from a password in a way that is
+    compatible with certain variants of Couchbase Lite in which a slightly different
+    hashing algorithm is used.  The same notes apply as in CBLEncryptionKey_FromPassword
+    @param key  The derived AES key will be stored here.
+    @param password  The input password, which can be any data.
+    @return  True on success, false if there was a problem deriving the key. */
+bool CBLEncryptionKey_FromPasswordOld(CBLEncryptionKey *key, FLString password) CBLAPI;
 #endif
 
 /** @} */
@@ -96,7 +103,8 @@ bool CBL_DatabaseExists(FLString name, FLString inDirectory) CBLAPI;
     @param fromPath  The full filesystem path to the original database (including extension).
     @param toName  The new database name (without the ".cblite2" extension.)
     @param config  The database configuration (directory and encryption option.)
-    @param outError  On return, will be set to the error that occurred, if applicable.*/
+    @param outError  On return, will be set to the error that occurred, if applicable.
+    @note While a database is open, one or more of its files may be in use.  Attempting to copy a file, while it is in use, will fail.  We recommend that you close a database before attempting to copy it. */
 bool CBL_CopyDatabase(FLString fromPath,
                       FLString toName,
                       const CBLDatabaseConfiguration* _cbl_nullable config,
@@ -213,15 +221,15 @@ bool CBLDatabase_PerformMaintenance(CBLDatabase* db,
 /** Returns the database's name. */
 FLString CBLDatabase_Name(const CBLDatabase*) CBLAPI;
 
-/** Returns the database's full filesystem path. */
+/** Returns the database's full filesystem path, or null slice if the database is closed or deleted. */
 _cbl_warn_unused
 FLStringResult CBLDatabase_Path(const CBLDatabase*) CBLAPI;
 
-/** Returns the number of documents in the database. */
+/** Returns the number of documents in the database, or zero if the database is closed or deleted.
+    @warning  <b>Deprecated :</b> Use CBLCollection_Count on the default collection instead. */
 uint64_t CBLDatabase_Count(const CBLDatabase*) CBLAPI;
 
-/** Returns the database's configuration, as given when it was opened.
-    @note  The encryption key is not filled in, for security reasons. */
+/** Returns the database's configuration, as given when it was opened. */
 const CBLDatabaseConfiguration CBLDatabase_Config(const CBLDatabase*) CBLAPI;
 
 /** @} */
@@ -232,16 +240,17 @@ const CBLDatabaseConfiguration CBLDatabase_Config(const CBLDatabase*) CBLAPI;
 #endif
 /** \name  Database listeners
     @{
-    A database change listener lets you detect changes made to all documents in a database.
+    A database change listener lets you detect changes made to all documents in the default collection.
     (If you only want to observe specific documents, use a \ref CBLDocumentChangeListener instead.)
     @note If there are multiple \ref CBLDatabase instances on the same database file, each one's
     listeners will be notified of changes made by other database instances.
     @warning  Changes made to the database file by other processes will _not_ be notified. */
 
-/** A database change listener callback, invoked after one or more documents are changed on disk.
+/** A default collection change listener callback, invoked after one or more documents in the default collection are changed on disk.
     @warning  By default, this listener may be called on arbitrary threads. If your code isn't
-                    prepared for that, you may want to use \ref CBLDatabase_BufferNotifications
-                    so that listeners will be called in a safe context.
+              prepared for that, you may want to use \ref CBLDatabase_BufferNotifications
+              so that listeners will be called in a safe context.
+    @warning  <b>Deprecated :</b> CBLCollectionChangeListener instead.
     @param context  An arbitrary value given when the callback was registered.
     @param db  The database that changed.
     @param numDocs  The number of documents that changed (size of the `docIDs` array)
@@ -251,13 +260,13 @@ typedef void (*CBLDatabaseChangeListener)(void* _cbl_nullable context,
                                           unsigned numDocs,
                                           FLString docIDs[_cbl_nonnull]);
 
-/** Registers a database change listener callback. It will be called after one or more
+/** Registers a default collection change listener callback. It will be called after one or more
     documents are changed on disk.
+    @warning  <b>Deprecated :</b> Use CBLCollection_AddChangeListener on the default collection instead.
     @param db  The database to observe.
     @param listener  The callback to be invoked.
     @param context  An opaque value that will be passed to the callback.
-    @return  A token to be passed to \ref CBLListener_Remove when it's time to remove the
-            listener.*/
+    @return  A token to be passed to \ref CBLListener_Remove when it's time to remove the listener.*/
 _cbl_warn_unused
 CBLListenerToken* CBLDatabase_AddChangeListener(const CBLDatabase* db,
                                                 CBLDatabaseChangeListener listener,
@@ -303,7 +312,7 @@ typedef void (*CBLNotificationsReadyCallback)(void* _cbl_nullable context,
     @param callback  The function to be called when a notification is available.
     @param context  An arbitrary value that will be passed to the callback. */
 void CBLDatabase_BufferNotifications(CBLDatabase *db,
-                                     CBLNotificationsReadyCallback callback,
+                                     CBLNotificationsReadyCallback _cbl_nullable callback,
                                      void* _cbl_nullable context) CBLAPI;
 
 /** Immediately issues all pending notifications for this database, by calling their listener

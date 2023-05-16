@@ -23,7 +23,7 @@
 
 #include "CBL_Edition.h"
 #include "CBL_Compat.h"
-#include "fleece/FLSlice.h"
+#include "fleece/Fleece.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -180,6 +180,18 @@ void CBL_DumpInstances(void) CBLAPI;
      @{ */
 /** A connection to an open database. */
 typedef struct CBLDatabase   CBLDatabase;
+/** @} */
+
+/** \defgroup scope  Scope
+     @{ */
+/** A  collection's scope. */
+typedef struct CBLScope CBLScope;
+/** @} */
+
+/** \defgroup collection  Collection
+     @{ */
+/** A collection, a document container. */
+typedef struct CBLCollection    CBLCollection;
 /** @} */
 
 /** \defgroup documents  Documents

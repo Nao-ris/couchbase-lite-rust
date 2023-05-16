@@ -18,7 +18,6 @@
 
 #pragma once
 #include "CBLBase.h"
-#include "fleece/Fleece.h"
 
 CBL_CAPI_BEGIN
 
@@ -82,11 +81,11 @@ CBL_CAPI_BEGIN
     /** Returns the length in bytes of a blob's content (from its `length` property). */
     uint64_t CBLBlob_Length(const CBLBlob*) CBLAPI;
 
-    /** Returns the cryptographic digest of a blob's content (from its `digest` property). */
-    FLString CBLBlob_Digest(const CBLBlob*) CBLAPI;
-
     /** Returns a blob's MIME type, if its metadata has a `content_type` property. */
     FLString CBLBlob_ContentType(const CBLBlob*) CBLAPI;
+
+    /** Returns the cryptographic digest of a blob's content (from its `digest` property). */
+    FLString CBLBlob_Digest(const CBLBlob*) CBLAPI;
 
     /** Returns a blob's metadata. This includes the `digest`, `length`, `content_type`,
         and `@type` properties, as well as any custom ones that may have been added. */
@@ -100,7 +99,7 @@ CBL_CAPI_BEGIN
 #pragma mark - READING:
 #endif
 
-    /** Reads the blob's contents into memory and returns them.
+    /** Reads the blob's content into memory and returns them.
         @note  You are responsible for releasing the result by calling \ref FLSliceResult_Release. */
     _cbl_warn_unused
     FLSliceResult CBLBlob_Content(const CBLBlob* blob,
@@ -251,10 +250,7 @@ CBL_CAPI_BEGIN
 #pragma mark - BINDING DEV SUPPORT FOR BLOB:
 #endif
 
-    /** (UNCOMMITTED) Use this API if you are developing Javascript language bindings.
-        If you are developing a native app, you must use the CBLBlob API.
-     
-        Get a \ref CBLBlob object from the database using the \ref CBLBlob properties.
+    /** Get a \ref CBLBlob object from the database using the \ref CBLBlob properties.
         
         The \ref CBLBlob properties is a blob's metadata containing two required fields
         which are a special marker property `"@type":"blob"`, and property `digest` whose value
@@ -271,10 +267,7 @@ CBL_CAPI_BEGIN
     const CBLBlob* _cbl_nullable CBLDatabase_GetBlob(CBLDatabase* db, FLDict properties,
                                                      CBLError* _cbl_nullable outError) CBLAPI;
 
-    /** (UNCOMMITTED) Use this API if you are developing Javascript language bindings.
-        If you are developing a native app, you must use the CBLBlob API.
-        
-        Save a new \ref CBLBlob object into the database without associating it with
+    /** Save a new \ref CBLBlob object into the database without associating it with
         any documents. The properties of the saved \ref CBLBlob object will include
         information necessary for referencing the \ref CBLBlob object in the properties
         of the document to be saved into the database.
