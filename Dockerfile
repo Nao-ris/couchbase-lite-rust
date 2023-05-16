@@ -20,7 +20,7 @@ ADD libcblite libcblite
 RUN strip /build/libcblite/lib/x86_64-linux-android/libcblite.so -o /build/libcblite/lib/x86_64-linux-android/libcblite.stripped.so
 RUN strip /build/libcblite/lib/i686-linux-android/libcblite.so -o /build/libcblite/lib/i686-linux-android/libcblite.stripped.so
 RUN /usr/aarch64-linux-gnu/bin/strip /build/libcblite/lib/aarch64-linux-android/libcblite.so -o /build/libcblite/lib/aarch64-linux-android/libcblite.stripped.so
-RUN /usr/aarch64-linux-gnu/bin/strip /build/libcblite/lib/armv7-linux-androideabi/libcblite.so -o /build/libcblite/lib/armv7-linux-androideabi/libcblite.stripped.so
+RUN /usr/aarch64-linux-gnu/bin/strip /build/libcblite/lib/arm-linux-androideabi/libcblite.so -o /build/libcblite/lib/arm-linux-androideabi/libcblite.stripped.so
 RUN strip /build/libcblite/lib/x86_64-pc-windows-gnu/cblite.dll -o /build/libcblite/lib/x86_64-pc-windows-gnu/cblite.stripped.dll
 
 FROM scratch AS strip 

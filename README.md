@@ -45,7 +45,7 @@ Install strip:
 Strip:
     ``$ cd /build/libcblite-3.0.3/lib/aarch64-linux-android
     $ strip libcblite.so -o libcblite.stripped.so
-    $ cd /build/libcblite-3.0.3/lib/armv7-linux-androideabi
+    $ cd /build/libcblite-3.0.3/lib/arm-linux-androideabi
     $ strip libcblite.so -o libcblite.stripped.so``
 
 
