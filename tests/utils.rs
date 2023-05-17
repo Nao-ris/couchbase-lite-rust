@@ -2,6 +2,11 @@ extern crate couchbase_lite;
 extern crate tempdir;
 
 use self::couchbase_lite::*;
+use self::couchbase_lite::callbacks::*;
+use self::couchbase_lite::configuration::*;
+use self::couchbase_lite::endpoint::*;
+use self::couchbase_lite::replicator::*;
+
 use self::tempdir::TempDir;
 
 use std::{
@@ -111,6 +116,8 @@ fn generate_replication_configuration(
         trusted_root_certificates: None,
         channels: MutableArray::default(),
         document_ids: config.document_ids,
+        collections: None,
+        accept_parent_domain_cookies: false,
     }
 }
 
