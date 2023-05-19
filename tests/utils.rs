@@ -101,7 +101,7 @@ fn generate_replication_configuration(
     config: ReplicationTestConfiguration,
 ) -> ReplicatorConfiguration {
     ReplicatorConfiguration {
-        database: local_db.clone(),
+        database: Some(local_db.clone()),
         endpoint: Endpoint::new_with_local_db(central_db),
         replicator_type: config.replicator_type,
         continuous: config.continuous,
