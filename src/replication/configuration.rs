@@ -80,10 +80,10 @@ impl ReplicationCollection {
 
 /** The configuration of a replicator. */
 pub struct ReplicatorConfiguration {
-    pub database: Database,              // The database to replicate
-    pub endpoint: Endpoint,              // The address of the other database to replicate with
+    pub database: Option<Database>, // The database to replicate. When setting the database, ONLY the default collection will be used for replication. (Required if collections is not set).
+    pub endpoint: Endpoint,         // The address of the other database to replicate with
     pub replicator_type: ReplicatorType, // Push, pull or both
-    pub continuous: bool,                // Continuous replication?
+    pub continuous: bool,           // Continuous replication?
     //-- Auto Purge:
     /**
     If auto purge is active, then the library will automatically purge any documents that the replicating

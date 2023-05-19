@@ -50,6 +50,7 @@ pub struct Replicator {
     pub headers: Option<MutableDict>,
     pub context: Option<Box<ReplicationConfigurationContext>>,
     change_listeners: ReplicatorsListeners<ReplicatorChangeListener>,
+    _collections: Option<Vec<CBLReplicationCollection>>,
     document_listeners: ReplicatorsListeners<ReplicatedDocumentListener>,
 }
 
@@ -77,7 +78,11 @@ impl Replicator {
                 });
 
             let cbl_config = CBLReplicatorConfiguration {
-                database: retain(config.database.get_ref()),
+                database: config
+                    .database
+                    .as_ref()
+                    .map(|d| retain(d.get_ref()))
+                    .unwrap_or(ptr::null_mut()),
                 endpoint: config.endpoint.get_ref(),
                 replicatorType: config.replicator_type.clone().into(),
                 continuous: config.continuous,
@@ -131,7 +136,7 @@ impl Replicator {
                 } else {
                     ptr::null_mut()
                 },
-                collectionCount: collections.map(|c| c.len()).unwrap_or_default(),
+                collectionCount: collections.as_ref().map(|c| c.len()).unwrap_or_default(),
                 acceptParentDomainCookies: config.accept_parent_domain_cookies,
                 context: std::ptr::addr_of!(*context) as *mut _,
             };
@@ -141,6 +146,7 @@ impl Replicator {
 
             check_error(&error).map(move |_| Self {
                 cbl_ref: replicator,
+                _collections: collections,
                 config: Some(config),
                 headers: Some(headers),
                 context: Some(context),
