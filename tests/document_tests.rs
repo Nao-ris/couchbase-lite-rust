@@ -2,7 +2,6 @@ extern crate core;
 extern crate couchbase_lite;
 
 use self::couchbase_lite::*;
-use self::couchbase_lite::callbacks::*;
 use std::time::Duration;
 
 pub mod utils;

@@ -18,8 +18,6 @@
 extern crate couchbase_lite;
 
 use self::couchbase_lite::*;
-use self::couchbase_lite::callbacks::*;
-use self::couchbase_lite::configuration::*;
 use encryptable::Encryptable;
 use std::{time::Duration, thread};
 
