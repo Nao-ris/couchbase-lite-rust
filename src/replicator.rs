@@ -31,9 +31,10 @@ use crate::{
         CBLListener_Remove, CBLAuth_CreatePassword, CBLAuth_CreateSession, CBLAuthenticator,
         CBLDocument, CBLDocumentFlags, CBLEndpoint, CBLEndpoint_CreateWithLocalDB,
         CBLEndpoint_CreateWithURL, CBLError, CBLProxySettings, CBLProxyType, CBLReplicatedDocument,
-        CBLReplicator, CBLReplicatorConfiguration, CBLReplicatorStatus, CBLReplicatorType,
-        CBLReplicator_AddChangeListener, CBLReplicator_AddDocumentReplicationListener,
-        CBLReplicator_Create, CBLReplicator_IsDocumentPending, CBLReplicator_PendingDocumentIDs,
+        CBLReplicator, CBLReplicationCollection, CBLReplicatorConfiguration, CBLReplicatorStatus,
+        CBLReplicatorType, CBLReplicator_AddChangeListener,
+        CBLReplicator_AddDocumentReplicationListener, CBLReplicator_Create,
+        CBLReplicator_IsDocumentPending, CBLReplicator_PendingDocumentIDs,
         CBLReplicator_SetHostReachable, CBLReplicator_SetSuspended, CBLReplicator_Start,
         CBLReplicator_Status, CBLReplicator_Stop, FLDict, FLSlice, FLSliceResult,
         FLSliceResult_New, FLSlice_Copy, FLString, FLStringResult, kCBLDocumentFlagsAccessRemoved,
@@ -41,6 +42,7 @@ use crate::{
         kCBLReplicatorConnecting, kCBLReplicatorIdle, kCBLReplicatorOffline, kCBLReplicatorStopped,
         kCBLReplicatorTypePull, kCBLReplicatorTypePush, kCBLReplicatorTypePushAndPull,
     },
+    collection::Collection,
     MutableArray, Listener, error,
 };
 
@@ -481,12 +483,43 @@ pub struct ReplicationConfigurationContext {
     pub property_decryptor: Option<PropertyDecryptor>,
 }
 
+pub struct ReplicationCollection {
+    pub collection: Collection,
+    pub conflict_resolver: Option<ConflictResolver>, // Optional conflict-resolver callback.
+    pub push_filter: Option<ReplicationFilter>, // Optional callback to filter which docs are pushed.
+    pub pull_filter: Option<ReplicationFilter>, // Optional callback to validate incoming docs.
+    pub channels: MutableArray,                 // Optional set of channels to pull from
+    pub document_ids: MutableArray,             // Optional set of document IDs to replicate
+}
+
+impl ReplicationCollection {
+    pub fn to_cbl_replication_collection(&self) -> CBLReplicationCollection {
+        CBLReplicationCollection {
+            collection: self.collection.get_ref(),
+            conflictResolver: self
+                .conflict_resolver
+                .as_ref()
+                .and(Some(c_replication_conflict_resolver)),
+            pushFilter: self
+                .push_filter
+                .as_ref()
+                .and(Some(c_replication_push_filter)),
+            pullFilter: self
+                .pull_filter
+                .as_ref()
+                .and(Some(c_replication_pull_filter)),
+            channels: self.channels.get_ref(),
+            documentIDs: self.document_ids.get_ref(),
+        }
+    }
+}
+
 /** The configuration of a replicator. */
 pub struct ReplicatorConfiguration {
-    pub database: Database,              // The database to replicate
-    pub endpoint: Endpoint,              // The address of the other database to replicate with
+    pub database: Option<Database>, // The database to replicate. When setting the database, ONLY the default collection will be used for replication.
+    pub endpoint: Endpoint,         // The address of the other database to replicate with
     pub replicator_type: ReplicatorType, // Push, pull or both
-    pub continuous: bool,                // Continuous replication?
+    pub continuous: bool,           // Continuous replication?
     //-- Auto Purge:
     /**
     If auto purge is active, then the library will automatically purge any documents that the replicating
@@ -513,6 +546,16 @@ pub struct ReplicatorConfiguration {
     //-- Filtering:
     pub channels: MutableArray, // Optional set of channels to pull from
     pub document_ids: MutableArray, // Optional set of document IDs to replicate
+    pub collections: Option<Vec<ReplicationCollection>>, // The collections to replicate with the target's endpoint (Required if the database is not set).
+    //-- Advanced HTTP settings:
+    /** The option to remove the restriction that does not allow the replicator to save the parent-domain
+    cookies, the cookies whose domains are the parent domain of the remote host, from the HTTP
+    response. For example, when the option is set to true, the cookies whose domain are “.foo.com”
+    returned by “bar.foo.com” host will be permitted to save. This is only recommended if the host
+    issuing the cookie is well trusted.
+    This option is disabled by default (see \ref kCBLDefaultReplicatorAcceptParentCookies) which means
+    that the parent-domain cookies are not permitted to save by default. */
+    pub accept_parent_domain_cookies: bool,
 }
 
 //======== LIFECYCLE
@@ -544,9 +587,20 @@ impl Replicator {
     ) -> Result<Self> {
         unsafe {
             let headers = MutableDict::from_hashmap(&config.headers);
+            let mut collections: Option<Vec<CBLReplicationCollection>> =
+                config.collections.as_ref().map(|collections| {
+                    collections
+                        .iter()
+                        .map(|c| c.to_cbl_replication_collection())
+                        .collect()
+                });
 
             let cbl_config = CBLReplicatorConfiguration {
-                database: retain(config.database.get_ref()),
+                database: config
+                    .database
+                    .as_ref()
+                    .map(|d| retain(d.get_ref()))
+                    .unwrap_or(ptr::null_mut()),
                 endpoint: config.endpoint.get_ref(),
                 replicatorType: config.replicator_type.clone().into(),
                 continuous: config.continuous,
@@ -595,9 +649,13 @@ impl Replicator {
                     .and(Some(c_property_decryptor)),
                 documentPropertyEncryptor: None,
                 documentPropertyDecryptor: None,
-                collections: ptr::null_mut(),
-                collectionCount: 0,
-                acceptParentDomainCookies: false,
+                collections: if let Some(collections) = collections.as_mut() {
+                    collections.as_mut_ptr()
+                } else {
+                    ptr::null_mut()
+                },
+                collectionCount: collections.as_ref().map(|c| c.len()).unwrap_or_default(),
+                acceptParentDomainCookies: config.accept_parent_domain_cookies,
                 context: std::ptr::addr_of!(*context) as *mut _,
             };
 
