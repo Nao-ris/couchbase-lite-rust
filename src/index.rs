@@ -36,6 +36,7 @@ impl ValueIndexConfiguration {
 }
 
 impl Database {
+    #[deprecated(note = "please use `create_index` on default collection instead")]
     pub fn create_index(&self, name: &str, config: &ValueIndexConfiguration) -> Result<bool> {
         let mut err = CBLError::default();
         let slice = from_str(name);
@@ -53,6 +54,7 @@ impl Database {
         failure(err)
     }
 
+    #[deprecated(note = "please use `delete_index` on default collection instead")]
     pub fn delete_index(&self, name: &str) -> Result<bool> {
         let mut err = CBLError::default();
         let slice = from_str(name);
@@ -63,6 +65,7 @@ impl Database {
         failure(err)
     }
 
+    #[deprecated(note = "please use `get_index_names` on default collection instead")]
     pub fn get_index_names(&self) -> Array {
         let arr = unsafe { CBLDatabase_GetIndexNames(self.get_ref()) };
         Array::wrap(arr)

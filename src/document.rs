@@ -80,6 +80,7 @@ unsafe extern "C" fn c_conflict_handler(
 
 /**  A document change listener lets you detect changes made to a specific document after they
 are persisted to the database. */
+#[deprecated(note = "please use `CollectionDocumentChangeListener` instead")]
 type DatabaseDocumentChangeListener = Box<dyn Fn(&Database, Option<String>)>;
 
 #[no_mangle]
@@ -98,6 +99,7 @@ unsafe extern "C" fn c_database_document_change_listener(
 impl Database {
     /** Reads a document from the database. Each call to this function returns a new object
     containing the document's current state. */
+    #[deprecated(note = "please use `get_document` on default collection instead")]
     pub fn get_document(&self, id: &str) -> Result<Document> {
         unsafe {
             // we always get a mutable CBLDocument,
@@ -121,6 +123,7 @@ impl Database {
     this one. This can lead to data loss! To avoid this, call
     `save_document_with_concurency_control` or
     `save_document_resolving` instead. */
+    #[deprecated(note = "please use `save_document` on default collection instead")]
     pub fn save_document(&mut self, doc: &mut Document) -> Result<()> {
         unsafe {
             check_bool(|error| CBLDatabase_SaveDocument(self.get_ref(), doc.get_ref(), error))
@@ -132,6 +135,9 @@ impl Database {
     parameter specifies whether the save should fail, or the conflicting revision should
     be overwritten with the revision being saved.
     If you need finer-grained control, call `save_document_resolving` instead. */
+    #[deprecated(
+        note = "please use `save_document_with_concurrency_control` on default collection instead"
+    )]
     pub fn save_document_with_concurency_control(
         &mut self,
         doc: &mut Document,
@@ -153,6 +159,7 @@ impl Database {
     /** Saves a new or modified document to the database. This function is the same as
     `save_document`, except that it allows for custom conflict handling in the event
     that the document has been updated since `doc` was loaded. */
+    #[deprecated(note = "please use `save_document_resolving` on default collection instead")]
     pub fn save_document_resolving(
         &mut self,
         doc: &mut Document,
@@ -176,6 +183,7 @@ impl Database {
     }
 
     /** Deletes a document from the database. Deletions are replicated. */
+    #[deprecated(note = "please use `delete_document` on default collection instead")]
     pub fn delete_document(&mut self, doc: &Document) -> Result<()> {
         unsafe {
             check_bool(|error| CBLDatabase_DeleteDocument(self.get_ref(), doc.get_ref(), error))
@@ -183,6 +191,9 @@ impl Database {
     }
 
     /** Deletes a document from the database. Deletions are replicated. */
+    #[deprecated(
+        note = "please use `delete_document_with_concurrency_control` on default collection instead"
+    )]
     pub fn delete_document_with_concurency_control(
         &mut self,
         doc: &Document,
@@ -203,6 +214,7 @@ impl Database {
 
     /** Purges a document. This removes all traces of the document from the database.
     Purges are _not_ replicated. If the document is changed on a server, it will be re-created */
+    #[deprecated(note = "please use `purge_document` on default collection instead")]
     pub fn purge_document(&mut self, doc: &Document) -> Result<()> {
         unsafe {
             check_bool(|error| CBLDatabase_PurgeDocument(self.get_ref(), doc.get_ref(), error))
@@ -210,6 +222,7 @@ impl Database {
     }
 
     /** Purges a document, given only its ID. */
+    #[deprecated(note = "please use `purge_document_by_id` on default collection instead")]
     pub fn purge_document_by_id(&mut self, id: &str) -> Result<()> {
         unsafe {
             check_bool(|error| {
@@ -221,6 +234,7 @@ impl Database {
     /** Returns the time, if any, at which a given document will expire and be purged.
     Documents don't normally expire; you have to call `set_document_expiration`
     to set a document's expiration time. */
+    #[deprecated(note = "please use `document_expiration` on default collection instead")]
     pub fn document_expiration(&self, doc_id: &str) -> Result<Option<Timestamp>> {
         unsafe {
             let mut error = CBLError::default();
@@ -238,6 +252,7 @@ impl Database {
     }
 
     /** Sets or clears the expiration time of a document. */
+    #[deprecated(note = "please use `set_document_espiration` on default collection instead")]
     pub fn set_document_expiration(&mut self, doc_id: &str, when: Option<Timestamp>) -> Result<()> {
         let exp: i64 = match when {
             Some(Timestamp(n)) => n,
@@ -265,6 +280,7 @@ impl Database {
     You must keep the Listener object as long as you need it
     */
     #[must_use]
+    #[deprecated(note = "please use `add_document_change_listener` on default collection instead")]
     pub fn add_document_change_listener(
         &self,
         document: &Document,

@@ -93,6 +93,7 @@ enum_from_primitive! {
 }
 
 /** A database change listener callback, invoked after one or more documents are changed on disk. */
+#[deprecated(note = "please use `CollectionChangeListener` on default collection instead")]
 type DatabaseChangeListener = Box<dyn Fn(&Database, Vec<String>)>;
 
 #[no_mangle]
@@ -278,6 +279,7 @@ impl Database {
     }
 
     /** Returns the number of documents in the database. */
+    #[deprecated(note = "please use `count` on the default collection instead")]
     pub fn count(&self) -> u64 {
         unsafe { CBLDatabase_Count(self.get_ref()) }
     }
@@ -440,6 +442,7 @@ impl Database {
         You must keep the `Listener` object as long as you need it.
     */
     #[must_use]
+    #[deprecated(note = "please use `add_listener` on default collection instead")]
     pub fn add_listener(
         &mut self,
         listener: DatabaseChangeListener,
