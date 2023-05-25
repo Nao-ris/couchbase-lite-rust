@@ -17,9 +17,10 @@
 
 use crate::{
     c_api::{
-        CBLCollection_DeleteDocument, CBLCollection_DeleteDocumentWithConcurrencyControl,
-        CBLCollection_GetDocumentExpiration, CBLCollection_GetMutableDocument,
-        CBLCollection_PurgeDocument, CBLCollection_PurgeDocumentByID, CBLCollection_SaveDocument,
+        CBLCollection, CBLCollection_AddDocumentChangeListener, CBLCollection_DeleteDocument,
+        CBLCollection_DeleteDocumentWithConcurrencyControl, CBLCollection_GetDocumentExpiration,
+        CBLCollection_GetMutableDocument, CBLCollection_PurgeDocument,
+        CBLCollection_PurgeDocumentByID, CBLCollection_SaveDocument,
         CBLCollection_SaveDocumentWithConflictHandler,
         CBLCollection_SaveDocumentWithConcurrencyControl, CBLCollection_SetDocumentExpiration,
         CBLDatabase, CBLDatabase_AddDocumentChangeListener, CBLDatabase_DeleteDocument,
@@ -27,9 +28,9 @@ use crate::{
         CBLDatabase_GetMutableDocument, CBLDatabase_PurgeDocument, CBLDatabase_PurgeDocumentByID,
         CBLDatabase_SaveDocument, CBLDatabase_SaveDocumentWithConcurrencyControl,
         CBLDatabase_SaveDocumentWithConflictHandler, CBLDatabase_SetDocumentExpiration,
-        CBLDocument, CBLDocument_Create, CBLDocument_CreateJSON, CBLDocument_CreateWithID,
-        CBLDocument_ID, CBLDocument_MutableProperties, CBLDocument_Properties,
-        CBLDocument_RevisionID, CBLDocument_Sequence, CBLDocument_SetJSON,
+        CBLDocument, CBLDocumentChange, CBLDocument_Create, CBLDocument_CreateJSON,
+        CBLDocument_CreateWithID, CBLDocument_ID, CBLDocument_MutableProperties,
+        CBLDocument_Properties, CBLDocument_RevisionID, CBLDocument_Sequence, CBLDocument_SetJSON,
         CBLDocument_SetProperties, CBLError, FLString, kCBLConcurrencyControlFailOnConflict,
         kCBLConcurrencyControlLastWriteWins,
     },
@@ -79,15 +80,15 @@ unsafe extern "C" fn c_conflict_handler(
 
 /**  A document change listener lets you detect changes made to a specific document after they
 are persisted to the database. */
-type ChangeListener = Box<dyn Fn(&Database, Option<String>)>;
+type DatabaseDocumentChangeListener = Box<dyn Fn(&Database, Option<String>)>;
 
 #[no_mangle]
-unsafe extern "C" fn c_document_change_listener(
+unsafe extern "C" fn c_database_document_change_listener(
     context: *mut ::std::os::raw::c_void,
     db: *const CBLDatabase,
     c_doc_id: FLString,
 ) {
-    let callback = context as *const ChangeListener;
+    let callback = context as *const DatabaseDocumentChangeListener;
     let database = Database::retain(db as *mut CBLDatabase);
     (*callback)(&database, c_doc_id.to_string());
 }
@@ -267,8 +268,8 @@ impl Database {
     pub fn add_document_change_listener(
         &self,
         document: &Document,
-        listener: ChangeListener,
-    ) -> Listener<ChangeListener> {
+        listener: DatabaseDocumentChangeListener,
+    ) -> Listener<DatabaseDocumentChangeListener> {
         unsafe {
             let listener = Box::new(listener);
             let ptr = Box::into_raw(listener);
@@ -276,7 +277,7 @@ impl Database {
                 ListenerToken::new(CBLDatabase_AddDocumentChangeListener(
                     self.get_ref(),
                     CBLDocument_ID(document.get_ref()),
-                    Some(c_document_change_listener),
+                    Some(c_database_document_change_listener),
                     ptr.cast(),
                 )),
                 Box::from_raw(ptr),
@@ -286,6 +287,22 @@ impl Database {
 }
 
 //////// COLLECTION'S DOCUMENT API:
+
+/**  A document change listener lets you detect changes made to a specific document after they
+are persisted to the collection. */
+type CollectionDocumentChangeListener = Box<dyn Fn(Collection, Option<String>)>;
+
+#[no_mangle]
+unsafe extern "C" fn c_collection_document_change_listener(
+    context: *mut ::std::os::raw::c_void,
+    change: *const CBLDocumentChange,
+) {
+    let callback = context as *const CollectionDocumentChangeListener;
+    if let Some(change) = change.as_ref() {
+        let collection = Collection::retain(change.collection as *mut CBLCollection);
+        (*callback)(collection, change.docID.to_string());
+    }
+}
 
 impl Collection {
     /** Reads a document from the collection, creating a new (immutable) \ref CBLDocument object.
@@ -448,6 +465,27 @@ impl Collection {
                     error,
                 )
             })
+        }
+    }
+
+    /** Registers a document change listener callback. It will be called after a specific document is changed on disk. */
+    pub fn add_document_change_listener(
+        &self,
+        document: &Document,
+        listener: CollectionDocumentChangeListener,
+    ) -> Listener<CollectionDocumentChangeListener> {
+        unsafe {
+            let listener = Box::new(listener);
+            let ptr = Box::into_raw(listener);
+            Listener::new(
+                ListenerToken::new(CBLCollection_AddDocumentChangeListener(
+                    self.get_ref(),
+                    CBLDocument_ID(document.get_ref()),
+                    Some(c_collection_document_change_listener),
+                    ptr.cast(),
+                )),
+                Box::from_raw(ptr),
+            )
         }
     }
 }

@@ -93,7 +93,7 @@ enum_from_primitive! {
 }
 
 /** A database change listener callback, invoked after one or more documents are changed on disk. */
-type ChangeListener = Box<dyn Fn(&Database, Vec<String>)>;
+type DatabaseChangeListener = Box<dyn Fn(&Database, Vec<String>)>;
 
 #[no_mangle]
 unsafe extern "C" fn c_database_change_listener(
@@ -102,7 +102,7 @@ unsafe extern "C" fn c_database_change_listener(
     num_docs: ::std::os::raw::c_uint,
     c_doc_ids: *mut FLString,
 ) {
-    let callback = context as *const ChangeListener;
+    let callback = context as *const DatabaseChangeListener;
     let database = Database::retain(db as *mut CBLDatabase);
 
     let doc_ids = std::slice::from_raw_parts(c_doc_ids, num_docs as usize)
@@ -440,7 +440,10 @@ impl Database {
         You must keep the `Listener` object as long as you need it.
     */
     #[must_use]
-    pub fn add_listener(&mut self, listener: ChangeListener) -> Listener<ChangeListener> {
+    pub fn add_listener(
+        &mut self,
+        listener: DatabaseChangeListener,
+    ) -> Listener<DatabaseChangeListener> {
         unsafe {
             let listener = Box::new(listener);
             let ptr = Box::into_raw(listener);
