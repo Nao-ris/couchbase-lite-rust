@@ -549,13 +549,13 @@ fn decryptor_err_permanent(
 #[test]
 fn encryption_ok_decryption_ok() {
     let context1 = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor),
+        default_collection_property_encryptor: Some(encryptor),
+        default_collection_property_decryptor: Some(decryptor),
         ..Default::default()
     };
     let context2 = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor),
+        default_collection_property_encryptor: Some(encryptor),
+        default_collection_property_decryptor: Some(decryptor),
         ..Default::default()
     };
 
@@ -619,8 +619,8 @@ fn encryption_error_temporary() {
     };
 
     let context = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor_err_temporary),
-        property_decryptor: Some(decryptor),
+        default_collection_property_encryptor: Some(encryptor_err_temporary),
+        default_collection_property_decryptor: Some(decryptor),
         ..Default::default()
     };
 
@@ -654,8 +654,8 @@ fn encryption_error_temporary() {
 
     // Change local DB 1 replicator to make the encryption work
     let context = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor),
+        default_collection_property_encryptor: Some(encryptor),
+        default_collection_property_decryptor: Some(decryptor),
         ..Default::default()
     };
 
@@ -681,8 +681,8 @@ fn decryption_error_temporary() {
     };
 
     let context = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor_err_temporary),
+        default_collection_property_encryptor: Some(encryptor),
+        default_collection_property_decryptor: Some(decryptor_err_temporary),
         ..Default::default()
     };
 
@@ -716,8 +716,8 @@ fn decryption_error_temporary() {
 
     // Change local DB replicator to make the decryption work
     let context = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor),
+        default_collection_property_encryptor: Some(encryptor),
+        default_collection_property_decryptor: Some(decryptor),
         ..Default::default()
     };
 
@@ -743,8 +743,8 @@ fn encryption_error_permanent() {
     };
 
     let context = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor_err_permanent),
-        property_decryptor: Some(decryptor),
+        default_collection_property_encryptor: Some(encryptor_err_permanent),
+        default_collection_property_decryptor: Some(decryptor),
         ..Default::default()
     };
 
@@ -778,8 +778,8 @@ fn encryption_error_permanent() {
 
     // Change local DB 1 replicator to make the encryption work
     let context = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor),
+        default_collection_property_encryptor: Some(encryptor),
+        default_collection_property_decryptor: Some(decryptor),
         ..Default::default()
     };
 
@@ -825,8 +825,8 @@ fn decryption_error_permanent() {
     };
 
     let context = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor_err_permanent),
+        default_collection_property_encryptor: Some(encryptor),
+        default_collection_property_decryptor: Some(decryptor_err_permanent),
         ..Default::default()
     };
 
@@ -860,8 +860,8 @@ fn decryption_error_permanent() {
 
     // Change local DB replicator to make the decryption work
     let context = ReplicationConfigurationContext {
-        property_encryptor: Some(encryptor),
-        property_decryptor: Some(decryptor),
+        default_collection_property_encryptor: Some(encryptor),
+        default_collection_property_decryptor: Some(decryptor),
         ..Default::default()
     };
 

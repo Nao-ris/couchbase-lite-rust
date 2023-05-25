@@ -328,7 +328,7 @@ pub enum EncryptionError {
 \note   If a null result or an error is returned, the document will be failed to
         replicate with the kCBLErrorCrypto error. For security reason, the encryption
         cannot be skipped. */
-pub type PropertyEncryptor = fn(
+pub type DefaultCollectionPropertyEncryptor = fn(
     document_id: Option<String>,
     properties: Dict,
     key_path: Option<String>,
@@ -338,7 +338,7 @@ pub type PropertyEncryptor = fn(
     error: &Error,
 ) -> std::result::Result<Vec<u8>, EncryptionError>;
 #[no_mangle]
-pub extern "C" fn c_property_encryptor(
+pub extern "C" fn c_default_collection_property_encryptor(
     context: *mut ::std::os::raw::c_void,
     document_id: FLString,
     properties: FLDict,
@@ -355,7 +355,7 @@ pub extern "C" fn c_property_encryptor(
         let mut result = FLSliceResult_New(0);
         if let Some(input) = input.to_vec() {
             result = (*repl_conf_context)
-                .property_encryptor
+                .default_collection_property_encryptor
                 .map(|callback| {
                     callback(
                         document_id.to_string(),
@@ -403,7 +403,7 @@ pub extern "C" fn c_property_encryptor(
 \note   The decryption will be skipped (the encrypted data will be kept) when a null result
         without an error is returned. If an error is returned, the document will be failed to replicate
         with the kCBLErrorCrypto error. */
-pub type PropertyDecryptor = fn(
+pub type DefaultCollectionPropertyDecryptor = fn(
     document_id: Option<String>,
     properties: Dict,
     key_path: Option<String>,
@@ -413,7 +413,7 @@ pub type PropertyDecryptor = fn(
     error: &Error,
 ) -> std::result::Result<Vec<u8>, EncryptionError>;
 #[no_mangle]
-pub extern "C" fn c_property_decryptor(
+pub extern "C" fn c_default_collection_property_decryptor(
     context: *mut ::std::os::raw::c_void,
     document_id: FLString,
     properties: FLDict,
@@ -430,7 +430,7 @@ pub extern "C" fn c_property_decryptor(
         let mut result = FLSliceResult_New(0);
         if let Some(input) = input.to_vec() {
             result = (*repl_conf_context)
-                .property_decryptor
+                .default_collection_property_decryptor
                 .map(|callback| {
                     callback(
                         document_id.to_string(),
@@ -479,8 +479,8 @@ pub struct ReplicationConfigurationContext {
     pub push_filter: Option<ReplicationFilter>,
     pub pull_filter: Option<ReplicationFilter>,
     pub conflict_resolver: Option<ConflictResolver>,
-    pub property_encryptor: Option<PropertyEncryptor>,
-    pub property_decryptor: Option<PropertyDecryptor>,
+    pub default_collection_property_encryptor: Option<DefaultCollectionPropertyEncryptor>,
+    pub default_collection_property_decryptor: Option<DefaultCollectionPropertyDecryptor>,
 }
 
 pub struct ReplicationCollection {
@@ -640,13 +640,13 @@ impl Replicator {
                     .as_ref()
                     .and(Some(c_replication_conflict_resolver)),
                 propertyEncryptor: context
-                    .property_encryptor
+                    .default_collection_property_encryptor
                     .as_ref()
-                    .and(Some(c_property_encryptor)),
+                    .and(Some(c_default_collection_property_encryptor)),
                 propertyDecryptor: context
-                    .property_decryptor
+                    .default_collection_property_decryptor
                     .as_ref()
-                    .and(Some(c_property_decryptor)),
+                    .and(Some(c_default_collection_property_decryptor)),
                 documentPropertyEncryptor: None,
                 documentPropertyDecryptor: None,
                 collections: if let Some(collections) = collections.as_mut() {
