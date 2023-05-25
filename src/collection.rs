@@ -1,8 +1,9 @@
 use crate::{
-    CblRef, release, retain, check_error,
+    CblRef, Listener, ListenerToken, release, retain, check_error,
     c_api::{
-        CBLCollection, CBLScope, CBLCollection_Scope, CBLCollection_Name, CBLCollection_Count,
-        CBLScope_Name, CBLScope_CollectionNames, CBLScope_Collection, CBLError,
+        CBLCollection, CBLCollectionChange, CBLScope, CBLCollection_AddChangeListener,
+        CBLCollection_Scope, CBLCollection_Name, CBLCollection_Count, CBLScope_Name,
+        CBLScope_CollectionNames, CBLScope_Collection, CBLError,
     },
     error::Result,
     MutableArray,
@@ -41,6 +42,28 @@ impl Collection {
     pub fn count(&self) -> u64 {
         unsafe { CBLCollection_Count(self.get_ref()) }
     }
+
+    /** Registers a collection change listener callback. It will be called after one or more documents are changed on disk. */
+    pub fn add_listener(
+        &mut self,
+        listener: CollectionChangeListener,
+    ) -> Listener<CollectionChangeListener> {
+        unsafe {
+            let listener = Box::new(listener);
+            let ptr = Box::into_raw(listener);
+
+            Listener::new(
+                ListenerToken {
+                    cbl_ref: CBLCollection_AddChangeListener(
+                        self.get_ref(),
+                        Some(c_collection_change_listener),
+                        ptr.cast(),
+                    ),
+                },
+                Box::from_raw(ptr),
+            )
+        }
+    }
 }
 
 impl CblRef for Collection {
@@ -65,6 +88,26 @@ impl Clone for Collection {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Scope {
     cbl_ref: *mut CBLScope,
+}
+
+/** A collection change listener callback, invoked after one or more documents are changed on disk. */
+type CollectionChangeListener = Box<dyn Fn(Collection, Vec<String>)>;
+
+#[no_mangle]
+unsafe extern "C" fn c_collection_change_listener(
+    context: *mut ::std::os::raw::c_void,
+    change: *const CBLCollectionChange,
+) {
+    let callback = context as *const CollectionChangeListener;
+    if let Some(change) = change.as_ref() {
+        let collection = Collection::retain(change.collection as *mut CBLCollection);
+        let doc_ids = std::slice::from_raw_parts(change.docIDs, change.numDocs as usize)
+            .iter()
+            .filter_map(|doc_id| doc_id.to_string())
+            .collect();
+
+        (*callback)(collection, doc_ids);
+    }
 }
 
 impl Scope {
