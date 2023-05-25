@@ -399,6 +399,87 @@ pub extern "C" fn c_default_collection_property_encryptor(
     }
 }
 
+/** Callback that encrypts encryptable properties in documents pushed by the replicator.
+\note   If a null result or an error is returned, the document will be failed to
+        replicate with the kCBLErrorCrypto error. For security reason, the encryption
+        cannot be skipped. */
+pub type CollectionPropertyEncryptor = fn(
+    scope: Option<String>,
+    collection: Option<String>,
+    document_id: Option<String>,
+    properties: Dict,
+    key_path: Option<String>,
+    input: Vec<u8>,
+    algorithm: Option<String>,
+    kid: Option<String>,
+    error: &Error,
+) -> std::result::Result<Vec<u8>, EncryptionError>;
+#[no_mangle]
+pub extern "C" fn c_collection_property_encryptor(
+    context: *mut ::std::os::raw::c_void,
+    scope: FLString,
+    collection: FLString,
+    document_id: FLString,
+    properties: FLDict,
+    key_path: FLString,
+    input: FLSlice,
+    algorithm: *mut FLStringResult,
+    kid: *mut FLStringResult,
+    cbl_error: *mut CBLError,
+) -> FLSliceResult {
+    unsafe {
+        let repl_conf_context = context as *const ReplicationConfigurationContext;
+        let mut error = cbl_error.as_ref().map_or(Error::default(), Error::new);
+
+        let mut result = FLSliceResult_New(0);
+        if let Some(input) = input.to_vec() {
+            result = (*repl_conf_context)
+                .collection_property_encryptor
+                .map(|callback| {
+                    callback(
+                        scope.to_string(),
+                        collection.to_string(),
+                        document_id.to_string(),
+                        Dict::wrap(properties, &properties),
+                        key_path.to_string(),
+                        input,
+                        algorithm.as_ref().and_then(|s| s.clone().to_string()),
+                        kid.as_ref().and_then(|s| s.clone().to_string()),
+                        &error,
+                    )
+                })
+                .map_or(FLSliceResult_New(0), |v| match v {
+                    Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
+                    Err(err) => {
+                        match err {
+                            EncryptionError::Temporary => {
+                                error!("Encryption callback returned with transient error");
+                                error = Error {
+                                    code: ErrorCode::WebSocket(503),
+                                    internal_info: None,
+                                };
+                            }
+                            EncryptionError::Permanent => {
+                                error!("Encryption callback returned with non transient error");
+                                error = Error::cbl_error(CouchbaseLiteError::Crypto);
+                            }
+                        }
+
+                        FLSliceResult::null()
+                    }
+                });
+        } else {
+            error!("Encryption input is None");
+            error = Error::cbl_error(CouchbaseLiteError::Crypto);
+        }
+
+        if error != Error::default() {
+            *cbl_error = error.as_cbl_error();
+        }
+        result
+    }
+}
+
 /** Callback that decrypts encrypted encryptable properties in documents pulled by the replicator.
 \note   The decryption will be skipped (the encrypted data will be kept) when a null result
         without an error is returned. If an error is returned, the document will be failed to replicate
@@ -474,6 +555,87 @@ pub extern "C" fn c_default_collection_property_decryptor(
     }
 }
 
+/** Callback that decrypts encrypted encryptable properties in documents pulled by the replicator.
+\note   The decryption will be skipped (the encrypted data will be kept) when a null result
+        without an error is returned. If an error is returned, the document will be failed to replicate
+        with the kCBLErrorCrypto error. */
+pub type CollectionPropertyDecryptor = fn(
+    scope: Option<String>,
+    collection: Option<String>,
+    document_id: Option<String>,
+    properties: Dict,
+    key_path: Option<String>,
+    input: Vec<u8>,
+    algorithm: Option<String>,
+    kid: Option<String>,
+    error: &Error,
+) -> std::result::Result<Vec<u8>, EncryptionError>;
+#[no_mangle]
+pub extern "C" fn c_collection_property_decryptor(
+    context: *mut ::std::os::raw::c_void,
+    scope: FLString,
+    collection: FLString,
+    document_id: FLString,
+    properties: FLDict,
+    key_path: FLString,
+    input: FLSlice,
+    algorithm: FLString,
+    kid: FLString,
+    cbl_error: *mut CBLError,
+) -> FLSliceResult {
+    unsafe {
+        let repl_conf_context = context as *const ReplicationConfigurationContext;
+        let mut error = cbl_error.as_ref().map_or(Error::default(), Error::new);
+
+        let mut result = FLSliceResult_New(0);
+        if let Some(input) = input.to_vec() {
+            result = (*repl_conf_context)
+                .collection_property_decryptor
+                .map(|callback| {
+                    callback(
+                        scope.to_string(),
+                        collection.to_string(),
+                        document_id.to_string(),
+                        Dict::wrap(properties, &properties),
+                        key_path.to_string(),
+                        input.to_vec(),
+                        algorithm.to_string(),
+                        kid.to_string(),
+                        &error,
+                    )
+                })
+                .map_or(FLSliceResult_New(0), |v| match v {
+                    Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
+                    Err(err) => {
+                        match err {
+                            EncryptionError::Temporary => {
+                                error!("Decryption callback returned with transient error");
+                                error = Error {
+                                    code: ErrorCode::WebSocket(503),
+                                    internal_info: None,
+                                };
+                            }
+                            EncryptionError::Permanent => {
+                                error!("Decryption callback returned with non transient error");
+                                error = Error::cbl_error(CouchbaseLiteError::Crypto);
+                            }
+                        }
+
+                        FLSliceResult::null()
+                    }
+                });
+        } else {
+            error!("Decryption input is None");
+            error = Error::cbl_error(CouchbaseLiteError::Crypto);
+        }
+
+        if error != Error::default() {
+            *cbl_error = error.as_cbl_error();
+        }
+        result
+    }
+}
+
 #[derive(Default)]
 pub struct ReplicationConfigurationContext {
     pub push_filter: Option<ReplicationFilter>,
@@ -481,6 +643,8 @@ pub struct ReplicationConfigurationContext {
     pub conflict_resolver: Option<ConflictResolver>,
     pub default_collection_property_encryptor: Option<DefaultCollectionPropertyEncryptor>,
     pub default_collection_property_decryptor: Option<DefaultCollectionPropertyDecryptor>,
+    pub collection_property_encryptor: Option<CollectionPropertyEncryptor>,
+    pub collection_property_decryptor: Option<CollectionPropertyDecryptor>,
 }
 
 pub struct ReplicationCollection {
@@ -647,8 +811,14 @@ impl Replicator {
                     .default_collection_property_decryptor
                     .as_ref()
                     .and(Some(c_default_collection_property_decryptor)),
-                documentPropertyEncryptor: None,
-                documentPropertyDecryptor: None,
+                documentPropertyEncryptor: context
+                    .collection_property_encryptor
+                    .as_ref()
+                    .and(Some(c_collection_property_encryptor)),
+                documentPropertyDecryptor: context
+                    .collection_property_decryptor
+                    .as_ref()
+                    .and(Some(c_collection_property_decryptor)),
                 collections: if let Some(collections) = collections.as_mut() {
                     collections.as_mut_ptr()
                 } else {
