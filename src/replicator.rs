@@ -34,7 +34,8 @@ use crate::{
         CBLReplicator, CBLReplicationCollection, CBLReplicatorConfiguration, CBLReplicatorStatus,
         CBLReplicatorType, CBLReplicator_AddChangeListener,
         CBLReplicator_AddDocumentReplicationListener, CBLReplicator_Create,
-        CBLReplicator_IsDocumentPending, CBLReplicator_PendingDocumentIDs,
+        CBLReplicator_IsDocumentPending, CBLReplicator_IsDocumentPending2,
+        CBLReplicator_PendingDocumentIDs, CBLReplicator_PendingDocumentIDs2,
         CBLReplicator_SetHostReachable, CBLReplicator_SetSuspended, CBLReplicator_Start,
         CBLReplicator_Status, CBLReplicator_Stop, FLDict, FLSlice, FLSliceResult,
         FLSliceResult_New, FLSlice_Copy, FLString, FLStringResult, kCBLDocumentFlagsAccessRemoved,
@@ -912,6 +913,7 @@ impl Replicator {
     /** Indicates which documents have local changes that have not yet been pushed to the server
     by this replicator. This is of course a snapshot, that will go out of date as the replicator
     makes progress and/or documents are saved locally. */
+    #[deprecated(note = "please use `pending_document_ids_2` instead")]
     pub fn pending_document_ids(&self) -> Result<HashSet<String>> {
         unsafe {
             let mut error = CBLError::default();
@@ -929,17 +931,59 @@ impl Replicator {
         }
     }
 
+    /** Indicates which documents have local changes that have not yet been pushed to the server
+    by this replicator. This is of course a snapshot, that will go out of date as the replicator
+    makes progress and/or documents are saved locally. */
+    pub fn pending_document_ids_2(&self, collection: Collection) -> Result<HashSet<String>> {
+        unsafe {
+            let mut error = CBLError::default();
+            let docs: FLDict = CBLReplicator_PendingDocumentIDs2(
+                self.get_ref(),
+                collection.get_ref(),
+                std::ptr::addr_of_mut!(error),
+            );
+
+            check_error(&error).and_then(|()| {
+                if docs.is_null() {
+                    return Err(Error::default());
+                }
+
+                let dict = Dict::wrap(docs, self);
+                Ok(dict.to_keys_hash_set())
+            })
+        }
+    }
+
     /** Indicates whether the document with the given ID has local changes that have not yet been
     pushed to the server by this replicator.
 
     This is equivalent to, but faster than, calling \ref pending_document_ids and
     checking whether the result contains \p docID. See that function's documentation for details. */
+    #[deprecated(note = "please use `is_document_pending_2` instead")]
     pub fn is_document_pending(&self, doc_id: &str) -> Result<bool> {
         unsafe {
             let mut error = CBLError::default();
             let result = CBLReplicator_IsDocumentPending(
                 self.get_ref(),
                 from_str(doc_id).get_ref(),
+                std::ptr::addr_of_mut!(error),
+            );
+            check_error(&error).map(|_| result)
+        }
+    }
+
+    /** Indicates whether the document with the given ID has local changes that have not yet been
+    pushed to the server by this replicator.
+
+    This is equivalent to, but faster than, calling \ref pending_document_ids and
+    checking whether the result contains \p docID. See that function's documentation for details. */
+    pub fn is_document_pending_2(&self, collection: Collection, doc_id: &str) -> Result<bool> {
+        unsafe {
+            let mut error = CBLError::default();
+            let result = CBLReplicator_IsDocumentPending2(
+                self.get_ref(),
+                from_str(doc_id).get_ref(),
+                collection.get_ref(),
                 std::ptr::addr_of_mut!(error),
             );
             check_error(&error).map(|_| result)
@@ -1087,6 +1131,8 @@ unsafe extern "C" fn c_replicator_document_change_listener(
                 id: doc_id,
                 flags: document.flags,
                 error: check_error(&document.error),
+                scope: document.scope.to_string(),
+                collection: document.collection.to_string(),
             })
         })
         .collect();
@@ -1103,6 +1149,8 @@ pub struct ReplicatedDocument {
     pub id: String,        // The document ID
     pub flags: u32,        // Indicates whether the document was deleted or removed
     pub error: Result<()>, // Error, if document failed to replicate
+    pub scope: Option<String>,
+    pub collection: Option<String>,
 }
 
 /** Direction of document transfer. */
