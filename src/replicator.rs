@@ -31,11 +31,9 @@ use crate::{
         CBLListener_Remove, CBLAuth_CreatePassword, CBLAuth_CreateSession, CBLAuthenticator,
         CBLDocument, CBLDocumentFlags, CBLEndpoint, CBLEndpoint_CreateWithLocalDB,
         CBLEndpoint_CreateWithURL, CBLError, CBLProxySettings, CBLProxyType, CBLReplicatedDocument,
-        CBLReplicator, CBLReplicationCollection, CBLReplicatorConfiguration, CBLReplicatorStatus,
-        CBLReplicatorType, CBLReplicator_AddChangeListener,
-        CBLReplicator_AddDocumentReplicationListener, CBLReplicator_Create,
-        CBLReplicator_IsDocumentPending, CBLReplicator_IsDocumentPending2,
-        CBLReplicator_PendingDocumentIDs, CBLReplicator_PendingDocumentIDs2,
+        CBLReplicator, CBLReplicatorConfiguration, CBLReplicatorStatus, CBLReplicatorType,
+        CBLReplicator_AddChangeListener, CBLReplicator_AddDocumentReplicationListener,
+        CBLReplicator_Create, CBLReplicator_IsDocumentPending, CBLReplicator_PendingDocumentIDs,
         CBLReplicator_SetHostReachable, CBLReplicator_SetSuspended, CBLReplicator_Start,
         CBLReplicator_Status, CBLReplicator_Stop, FLDict, FLSlice, FLSliceResult,
         FLSliceResult_New, FLSlice_Copy, FLString, FLStringResult, kCBLDocumentFlagsAccessRemoved,
@@ -43,7 +41,6 @@ use crate::{
         kCBLReplicatorConnecting, kCBLReplicatorIdle, kCBLReplicatorOffline, kCBLReplicatorStopped,
         kCBLReplicatorTypePull, kCBLReplicatorTypePush, kCBLReplicatorTypePushAndPull,
     },
-    collection::Collection,
     MutableArray, Listener, error,
 };
 
@@ -329,8 +326,7 @@ pub enum EncryptionError {
 \note   If a null result or an error is returned, the document will be failed to
         replicate with the kCBLErrorCrypto error. For security reason, the encryption
         cannot be skipped. */
-#[deprecated(note = "please use `CollectionPropertyEncryptor` on default collection instead")]
-pub type DefaultCollectionPropertyEncryptor = fn(
+pub type PropertyEncryptor = fn(
     document_id: Option<String>,
     properties: Dict,
     key_path: Option<String>,
@@ -340,7 +336,7 @@ pub type DefaultCollectionPropertyEncryptor = fn(
     error: &Error,
 ) -> std::result::Result<Vec<u8>, EncryptionError>;
 #[no_mangle]
-pub extern "C" fn c_default_collection_property_encryptor(
+pub extern "C" fn c_property_encryptor(
     context: *mut ::std::os::raw::c_void,
     document_id: FLString,
     properties: FLDict,
@@ -357,90 +353,9 @@ pub extern "C" fn c_default_collection_property_encryptor(
         let mut result = FLSliceResult_New(0);
         if let Some(input) = input.to_vec() {
             result = (*repl_conf_context)
-                .default_collection_property_encryptor
+                .property_encryptor
                 .map(|callback| {
                     callback(
-                        document_id.to_string(),
-                        Dict::wrap(properties, &properties),
-                        key_path.to_string(),
-                        input,
-                        algorithm.as_ref().and_then(|s| s.clone().to_string()),
-                        kid.as_ref().and_then(|s| s.clone().to_string()),
-                        &error,
-                    )
-                })
-                .map_or(FLSliceResult_New(0), |v| match v {
-                    Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
-                    Err(err) => {
-                        match err {
-                            EncryptionError::Temporary => {
-                                error!("Encryption callback returned with transient error");
-                                error = Error {
-                                    code: ErrorCode::WebSocket(503),
-                                    internal_info: None,
-                                };
-                            }
-                            EncryptionError::Permanent => {
-                                error!("Encryption callback returned with non transient error");
-                                error = Error::cbl_error(CouchbaseLiteError::Crypto);
-                            }
-                        }
-
-                        FLSliceResult::null()
-                    }
-                });
-        } else {
-            error!("Encryption input is None");
-            error = Error::cbl_error(CouchbaseLiteError::Crypto);
-        }
-
-        if error != Error::default() {
-            *cbl_error = error.as_cbl_error();
-        }
-        result
-    }
-}
-
-/** Callback that encrypts encryptable properties in documents pushed by the replicator.
-\note   If a null result or an error is returned, the document will be failed to
-        replicate with the kCBLErrorCrypto error. For security reason, the encryption
-        cannot be skipped. */
-pub type CollectionPropertyEncryptor = fn(
-    scope: Option<String>,
-    collection: Option<String>,
-    document_id: Option<String>,
-    properties: Dict,
-    key_path: Option<String>,
-    input: Vec<u8>,
-    algorithm: Option<String>,
-    kid: Option<String>,
-    error: &Error,
-) -> std::result::Result<Vec<u8>, EncryptionError>;
-#[no_mangle]
-pub extern "C" fn c_collection_property_encryptor(
-    context: *mut ::std::os::raw::c_void,
-    scope: FLString,
-    collection: FLString,
-    document_id: FLString,
-    properties: FLDict,
-    key_path: FLString,
-    input: FLSlice,
-    algorithm: *mut FLStringResult,
-    kid: *mut FLStringResult,
-    cbl_error: *mut CBLError,
-) -> FLSliceResult {
-    unsafe {
-        let repl_conf_context = context as *const ReplicationConfigurationContext;
-        let mut error = cbl_error.as_ref().map_or(Error::default(), Error::new);
-
-        let mut result = FLSliceResult_New(0);
-        if let Some(input) = input.to_vec() {
-            result = (*repl_conf_context)
-                .collection_property_encryptor
-                .map(|callback| {
-                    callback(
-                        scope.to_string(),
-                        collection.to_string(),
                         document_id.to_string(),
                         Dict::wrap(properties, &properties),
                         key_path.to_string(),
@@ -486,8 +401,7 @@ pub extern "C" fn c_collection_property_encryptor(
 \note   The decryption will be skipped (the encrypted data will be kept) when a null result
         without an error is returned. If an error is returned, the document will be failed to replicate
         with the kCBLErrorCrypto error. */
-#[deprecated(note = "please use `CollectionPropertyDecryptor` on default collection instead")]
-pub type DefaultCollectionPropertyDecryptor = fn(
+pub type PropertyDecryptor = fn(
     document_id: Option<String>,
     properties: Dict,
     key_path: Option<String>,
@@ -497,7 +411,7 @@ pub type DefaultCollectionPropertyDecryptor = fn(
     error: &Error,
 ) -> std::result::Result<Vec<u8>, EncryptionError>;
 #[no_mangle]
-pub extern "C" fn c_default_collection_property_decryptor(
+pub extern "C" fn c_property_decryptor(
     context: *mut ::std::os::raw::c_void,
     document_id: FLString,
     properties: FLDict,
@@ -514,90 +428,9 @@ pub extern "C" fn c_default_collection_property_decryptor(
         let mut result = FLSliceResult_New(0);
         if let Some(input) = input.to_vec() {
             result = (*repl_conf_context)
-                .default_collection_property_decryptor
+                .property_decryptor
                 .map(|callback| {
                     callback(
-                        document_id.to_string(),
-                        Dict::wrap(properties, &properties),
-                        key_path.to_string(),
-                        input.to_vec(),
-                        algorithm.to_string(),
-                        kid.to_string(),
-                        &error,
-                    )
-                })
-                .map_or(FLSliceResult_New(0), |v| match v {
-                    Ok(v) => FLSlice_Copy(from_bytes(&v[..]).get_ref()),
-                    Err(err) => {
-                        match err {
-                            EncryptionError::Temporary => {
-                                error!("Decryption callback returned with transient error");
-                                error = Error {
-                                    code: ErrorCode::WebSocket(503),
-                                    internal_info: None,
-                                };
-                            }
-                            EncryptionError::Permanent => {
-                                error!("Decryption callback returned with non transient error");
-                                error = Error::cbl_error(CouchbaseLiteError::Crypto);
-                            }
-                        }
-
-                        FLSliceResult::null()
-                    }
-                });
-        } else {
-            error!("Decryption input is None");
-            error = Error::cbl_error(CouchbaseLiteError::Crypto);
-        }
-
-        if error != Error::default() {
-            *cbl_error = error.as_cbl_error();
-        }
-        result
-    }
-}
-
-/** Callback that decrypts encrypted encryptable properties in documents pulled by the replicator.
-\note   The decryption will be skipped (the encrypted data will be kept) when a null result
-        without an error is returned. If an error is returned, the document will be failed to replicate
-        with the kCBLErrorCrypto error. */
-pub type CollectionPropertyDecryptor = fn(
-    scope: Option<String>,
-    collection: Option<String>,
-    document_id: Option<String>,
-    properties: Dict,
-    key_path: Option<String>,
-    input: Vec<u8>,
-    algorithm: Option<String>,
-    kid: Option<String>,
-    error: &Error,
-) -> std::result::Result<Vec<u8>, EncryptionError>;
-#[no_mangle]
-pub extern "C" fn c_collection_property_decryptor(
-    context: *mut ::std::os::raw::c_void,
-    scope: FLString,
-    collection: FLString,
-    document_id: FLString,
-    properties: FLDict,
-    key_path: FLString,
-    input: FLSlice,
-    algorithm: FLString,
-    kid: FLString,
-    cbl_error: *mut CBLError,
-) -> FLSliceResult {
-    unsafe {
-        let repl_conf_context = context as *const ReplicationConfigurationContext;
-        let mut error = cbl_error.as_ref().map_or(Error::default(), Error::new);
-
-        let mut result = FLSliceResult_New(0);
-        if let Some(input) = input.to_vec() {
-            result = (*repl_conf_context)
-                .collection_property_decryptor
-                .map(|callback| {
-                    callback(
-                        scope.to_string(),
-                        collection.to_string(),
                         document_id.to_string(),
                         Dict::wrap(properties, &properties),
                         key_path.to_string(),
@@ -641,62 +474,19 @@ pub extern "C" fn c_collection_property_decryptor(
 
 #[derive(Default)]
 pub struct ReplicationConfigurationContext {
-    #[deprecated(note = "please use `collection.push_filter` on default collection instead")]
     pub push_filter: Option<ReplicationFilter>,
-    #[deprecated(note = "please use `collection.pull_filter` on default collection instead")]
     pub pull_filter: Option<ReplicationFilter>,
-    #[deprecated(note = "please use `collection.conflict_resolver` on default collection instead")]
     pub conflict_resolver: Option<ConflictResolver>,
-    #[deprecated(
-        note = "please use `collection_property_encryptor` on default collection instead"
-    )]
-    pub default_collection_property_encryptor: Option<DefaultCollectionPropertyEncryptor>,
-    #[deprecated(
-        note = "please use `collection_property_decryptor` on default collection instead"
-    )]
-    pub default_collection_property_decryptor: Option<DefaultCollectionPropertyDecryptor>,
-    pub collection_property_encryptor: Option<CollectionPropertyEncryptor>,
-    pub collection_property_decryptor: Option<CollectionPropertyDecryptor>,
-}
-
-pub struct ReplicationCollection {
-    pub collection: Collection,
-    pub conflict_resolver: Option<ConflictResolver>, // Optional conflict-resolver callback.
-    pub push_filter: Option<ReplicationFilter>, // Optional callback to filter which docs are pushed.
-    pub pull_filter: Option<ReplicationFilter>, // Optional callback to validate incoming docs.
-    pub channels: MutableArray,                 // Optional set of channels to pull from
-    pub document_ids: MutableArray,             // Optional set of document IDs to replicate
-}
-
-impl ReplicationCollection {
-    pub fn to_cbl_replication_collection(&self) -> CBLReplicationCollection {
-        CBLReplicationCollection {
-            collection: self.collection.get_ref(),
-            conflictResolver: self
-                .conflict_resolver
-                .as_ref()
-                .and(Some(c_replication_conflict_resolver)),
-            pushFilter: self
-                .push_filter
-                .as_ref()
-                .and(Some(c_replication_push_filter)),
-            pullFilter: self
-                .pull_filter
-                .as_ref()
-                .and(Some(c_replication_pull_filter)),
-            channels: self.channels.get_ref(),
-            documentIDs: self.document_ids.get_ref(),
-        }
-    }
+    pub property_encryptor: Option<PropertyEncryptor>,
+    pub property_decryptor: Option<PropertyDecryptor>,
 }
 
 /** The configuration of a replicator. */
 pub struct ReplicatorConfiguration {
-    #[deprecated(note = "use collections instead")]
-    pub database: Option<Database>, // The database to replicate. When setting the database, ONLY the default collection will be used for replication.
-    pub endpoint: Endpoint, // The address of the other database to replicate with
+    pub database: Database,              // The database to replicate
+    pub endpoint: Endpoint,              // The address of the other database to replicate with
     pub replicator_type: ReplicatorType, // Push, pull or both
-    pub continuous: bool,   // Continuous replication?
+    pub continuous: bool,                // Continuous replication?
     //-- Auto Purge:
     /**
     If auto purge is active, then the library will automatically purge any documents that the replicating
@@ -721,20 +511,8 @@ pub struct ReplicatorConfiguration {
     pub pinned_server_certificate: Option<Vec<u8>>, // An X.509 cert to "pin" TLS connections to (PEM or DER)
     pub trusted_root_certificates: Option<Vec<u8>>, // Set of anchor certs (PEM format)
     //-- Filtering:
-    #[deprecated(note = "please use `collection.channels` on default collection instead")]
     pub channels: MutableArray, // Optional set of channels to pull from
-    #[deprecated(note = "please use `collection.document_ids` on default collection instead")]
     pub document_ids: MutableArray, // Optional set of document IDs to replicate
-    pub collections: Option<Vec<ReplicationCollection>>, // The collections to replicate with the target's endpoint (Required if the database is not set).
-    //-- Advanced HTTP settings:
-    /** The option to remove the restriction that does not allow the replicator to save the parent-domain
-    cookies, the cookies whose domains are the parent domain of the remote host, from the HTTP
-    response. For example, when the option is set to true, the cookies whose domain are “.foo.com”
-    returned by “bar.foo.com” host will be permitted to save. This is only recommended if the host
-    issuing the cookie is well trusted.
-    This option is disabled by default (see \ref kCBLDefaultReplicatorAcceptParentCookies) which means
-    that the parent-domain cookies are not permitted to save by default. */
-    pub accept_parent_domain_cookies: bool,
 }
 
 //======== LIFECYCLE
@@ -766,20 +544,9 @@ impl Replicator {
     ) -> Result<Self> {
         unsafe {
             let headers = MutableDict::from_hashmap(&config.headers);
-            let mut collections: Option<Vec<CBLReplicationCollection>> =
-                config.collections.as_ref().map(|collections| {
-                    collections
-                        .iter()
-                        .map(|c| c.to_cbl_replication_collection())
-                        .collect()
-                });
 
             let cbl_config = CBLReplicatorConfiguration {
-                database: config
-                    .database
-                    .as_ref()
-                    .map(|d| retain(d.get_ref()))
-                    .unwrap_or(ptr::null_mut()),
+                database: retain(config.database.get_ref()),
                 endpoint: config.endpoint.get_ref(),
                 replicatorType: config.replicator_type.clone().into(),
                 continuous: config.continuous,
@@ -819,28 +586,13 @@ impl Replicator {
                     .as_ref()
                     .and(Some(c_replication_conflict_resolver)),
                 propertyEncryptor: context
-                    .default_collection_property_encryptor
+                    .property_encryptor
                     .as_ref()
-                    .and(Some(c_default_collection_property_encryptor)),
+                    .and(Some(c_property_encryptor)),
                 propertyDecryptor: context
-                    .default_collection_property_decryptor
+                    .property_decryptor
                     .as_ref()
-                    .and(Some(c_default_collection_property_decryptor)),
-                documentPropertyEncryptor: context
-                    .collection_property_encryptor
-                    .as_ref()
-                    .and(Some(c_collection_property_encryptor)),
-                documentPropertyDecryptor: context
-                    .collection_property_decryptor
-                    .as_ref()
-                    .and(Some(c_collection_property_decryptor)),
-                collections: if let Some(collections) = collections.as_mut() {
-                    collections.as_mut_ptr()
-                } else {
-                    ptr::null_mut()
-                },
-                collectionCount: collections.as_ref().map(|c| c.len()).unwrap_or_default(),
-                acceptParentDomainCookies: config.accept_parent_domain_cookies,
+                    .and(Some(c_property_decryptor)),
                 context: std::ptr::addr_of!(*context) as *mut _,
             };
 
@@ -927,7 +679,6 @@ impl Replicator {
     /** Indicates which documents have local changes that have not yet been pushed to the server
     by this replicator. This is of course a snapshot, that will go out of date as the replicator
     makes progress and/or documents are saved locally. */
-    #[deprecated(note = "please use `pending_document_ids_2` instead")]
     pub fn pending_document_ids(&self) -> Result<HashSet<String>> {
         unsafe {
             let mut error = CBLError::default();
@@ -945,59 +696,17 @@ impl Replicator {
         }
     }
 
-    /** Indicates which documents have local changes that have not yet been pushed to the server
-    by this replicator. This is of course a snapshot, that will go out of date as the replicator
-    makes progress and/or documents are saved locally. */
-    pub fn pending_document_ids_2(&self, collection: Collection) -> Result<HashSet<String>> {
-        unsafe {
-            let mut error = CBLError::default();
-            let docs: FLDict = CBLReplicator_PendingDocumentIDs2(
-                self.get_ref(),
-                collection.get_ref(),
-                std::ptr::addr_of_mut!(error),
-            );
-
-            check_error(&error).and_then(|()| {
-                if docs.is_null() {
-                    return Err(Error::default());
-                }
-
-                let dict = Dict::wrap(docs, self);
-                Ok(dict.to_keys_hash_set())
-            })
-        }
-    }
-
     /** Indicates whether the document with the given ID has local changes that have not yet been
     pushed to the server by this replicator.
 
     This is equivalent to, but faster than, calling \ref pending_document_ids and
     checking whether the result contains \p docID. See that function's documentation for details. */
-    #[deprecated(note = "please use `is_document_pending_2` instead")]
     pub fn is_document_pending(&self, doc_id: &str) -> Result<bool> {
         unsafe {
             let mut error = CBLError::default();
             let result = CBLReplicator_IsDocumentPending(
                 self.get_ref(),
                 from_str(doc_id).get_ref(),
-                std::ptr::addr_of_mut!(error),
-            );
-            check_error(&error).map(|_| result)
-        }
-    }
-
-    /** Indicates whether the document with the given ID has local changes that have not yet been
-    pushed to the server by this replicator.
-
-    This is equivalent to, but faster than, calling \ref pending_document_ids and
-    checking whether the result contains \p docID. See that function's documentation for details. */
-    pub fn is_document_pending_2(&self, collection: Collection, doc_id: &str) -> Result<bool> {
-        unsafe {
-            let mut error = CBLError::default();
-            let result = CBLReplicator_IsDocumentPending2(
-                self.get_ref(),
-                from_str(doc_id).get_ref(),
-                collection.get_ref(),
                 std::ptr::addr_of_mut!(error),
             );
             check_error(&error).map(|_| result)
@@ -1145,8 +854,6 @@ unsafe extern "C" fn c_replicator_document_change_listener(
                 id: doc_id,
                 flags: document.flags,
                 error: check_error(&document.error),
-                scope: document.scope.to_string(),
-                collection: document.collection.to_string(),
             })
         })
         .collect();
@@ -1163,8 +870,6 @@ pub struct ReplicatedDocument {
     pub id: String,        // The document ID
     pub flags: u32,        // Indicates whether the document was deleted or removed
     pub error: Result<()>, // Error, if document failed to replicate
-    pub scope: Option<String>,
-    pub collection: Option<String>,
 }
 
 /** Direction of document transfer. */

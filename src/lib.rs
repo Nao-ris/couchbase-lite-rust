@@ -29,13 +29,11 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::copy_iterator)]
 #![allow(clippy::missing_panics_doc)]
-#![allow(deprecated)]
 
 #[macro_use]
 extern crate enum_primitive;
 
 pub mod blob;
-pub mod collection;
 pub mod database;
 pub mod document;
 pub mod encryptable;
