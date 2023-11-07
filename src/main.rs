@@ -14,7 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#![allow(deprecated)]
 
 extern crate couchbase_lite;
 extern crate tempdir;
