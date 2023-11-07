@@ -593,11 +593,6 @@ impl Replicator {
                     .property_decryptor
                     .as_ref()
                     .and(Some(c_property_decryptor)),
-                documentPropertyEncryptor: None,
-                documentPropertyDecryptor: None,
-                collections: ptr::null_mut(),
-                collectionCount: 0,
-                acceptParentDomainCookies: false,
                 context: std::ptr::addr_of!(*context) as *mut _,
             };
 
