@@ -16,7 +16,7 @@
 //
 
 use crate::{
-    CblRef, ListenerToken, check_error, release, retain,
+    CblRef, Listener, ListenerToken, check_error, release, retain,
     slice::from_str,
     error::{Result, check_bool, failure},
     c_api::{
@@ -32,9 +32,9 @@ use crate::{
         kCBLMaintenanceTypeCompact, kCBLEncryptionNone, kCBLMaintenanceTypeFullOptimize,
         kCBLMaintenanceTypeIntegrityCheck, kCBLMaintenanceTypeOptimize, kCBLMaintenanceTypeReindex,
     },
-    collection::{Collection, Scope},
+    collection::Collection,
     fleece_mutable::MutableArray,
-    Listener,
+    scope::Scope,
 };
 use std::path::{Path, PathBuf};
 use std::ptr;

@@ -46,6 +46,7 @@ pub mod index;
 pub mod logging;
 pub mod query;
 pub mod replicator;
+pub mod scope;
 pub mod slice;
 
 mod c_api;
