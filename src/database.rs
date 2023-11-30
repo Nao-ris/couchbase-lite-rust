@@ -28,9 +28,9 @@ use crate::{
         CBLDatabase_SendNotifications, CBLEncryptionKey, CBLError, CBL_DatabaseExists,
         CBL_DeleteDatabase, CBLEncryptionKey_FromPassword, FLString, kCBLMaintenanceTypeCompact,
         kCBLEncryptionNone, kCBLMaintenanceTypeFullOptimize, kCBLMaintenanceTypeIntegrityCheck,
-        kCBLMaintenanceTypeOptimize, kCBLMaintenanceTypeReindex,
+        kCBLMaintenanceTypeOptimize, kCBLMaintenanceTypeReindex, CBL_CopyDatabase,
     },
-    Listener,
+    Listener, check_error,
 };
 use std::path::{Path, PathBuf};
 use std::ptr;
@@ -185,6 +185,39 @@ impl Database {
                 from_str(name).get_ref(),
                 from_str(in_directory.as_ref().to_str().unwrap()).get_ref(),
             )
+        }
+    }
+
+    /** Copies a database file to a new location, and assigns it a new internal UUID to distinguish
+    it from the original database when replicating. */
+    pub fn copy_file<P: AsRef<Path>>(
+        current_db_full_path: P,
+        new_db_name: &str,
+        config: Option<DatabaseConfiguration>,
+    ) -> Result<()> {
+        unsafe {
+            let config = config.map(|cfg| {
+                let mut c_config: CBLDatabaseConfiguration = CBLDatabaseConfiguration_Default();
+                c_config.directory = from_str(cfg.directory.to_str().unwrap()).get_ref();
+                if let Some(encryption_key) = cfg.encryption_key {
+                    c_config.encryptionKey = *encryption_key.get_ref();
+                }
+                c_config
+            });
+            let config_param = config
+                .as_ref()
+                .map(|cfg| cfg as *const CBLDatabaseConfiguration)
+                .unwrap_or(ptr::null());
+
+            let mut error = CBLError::default();
+            CBL_CopyDatabase(
+                from_str(current_db_full_path.as_ref().to_str().unwrap()).get_ref(),
+                from_str(new_db_name).get_ref(),
+                config_param,
+                &mut error,
+            );
+
+            check_error(&error)
         }
     }
 
