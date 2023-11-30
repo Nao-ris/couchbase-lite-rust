@@ -91,7 +91,7 @@ fn copy_file() {
         DB_NAME_BACKUP,
         Some(cfg.clone()),
     )
-    .expect("Database deletion failed");
+    .expect("Database copy failed");
     assert!(Database::exists(DB_NAME, tmp_dir.path()));
     assert!(Database::exists(DB_NAME_BACKUP, tmp_dir.path()));
 
