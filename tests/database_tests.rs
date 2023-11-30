@@ -90,13 +90,10 @@ fn copy_file() {
     assert!(Database::exists(DB_NAME, tmp_dir.path()));
 
     // Copy DB
+    let new_path = tmp_dir.path().join(format!("{DB_NAME}.cblite2"));
     let cfg2 = cfg.clone();
-    Database::copy_file(
-        tmp_dir.path().join(format!("{DB_NAME}.cblite2")),
-        DB_NAME_BACKUP,
-        Some(cfg2),
-    )
-    .expect("Database copy failed");
+    Database::copy_file(new_path.as_path(), DB_NAME_BACKUP, Some(cfg2.clone()))
+        .expect("Database copy failed");
     assert!(Database::exists(DB_NAME, tmp_dir.path()));
     assert!(Database::exists(DB_NAME_BACKUP, tmp_dir.path()));
 
