@@ -80,10 +80,6 @@ fn copy_file() {
             props.at("s").put_string("test");
             db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
                 .expect("save");
-            println!(
-                "Antoine - Initial DB full path: {}",
-                db.path().to_str().unwrap()
-            );
         }
         Err(_) => panic!("The initial database could not be opened"),
     }
@@ -103,10 +99,6 @@ fn copy_file() {
             let doc = db.get_document("foo").unwrap();
             assert_eq!(doc.properties().get("i").as_i64().unwrap(), 1);
             assert_eq!(doc.properties().get("s").as_string().unwrap(), "test");
-            println!(
-                "Antoine - New DB full path: {}",
-                db.path().to_str().unwrap()
-            );
         }
         Err(_) => panic!("The new database could not be opened"),
     }
