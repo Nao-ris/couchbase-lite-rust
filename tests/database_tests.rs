@@ -86,7 +86,7 @@ fn copy_file() {
     assert!(Database::exists(DB_NAME, tmp_dir.path()));
 
     // Copy DB
-    let new_path = tmp_dir.path().join(format!("{DB_NAME}.cblite2"));
+    let new_path = tmp_dir.path().join(format!("{DB_NAME}.cblite2/"));
     let cfg2 = Some(cfg.clone());
     Database::copy_file(new_path.as_path(), DB_NAME_BACKUP, cfg2).expect("Database copy failed");
     std::thread::sleep(Duration::from_secs(5));

@@ -42,7 +42,9 @@ fn start_stop_delete_db_start() {
         encryption_key: None,
     };
 
-    let mut local_database = Some(Database::open("local", Some(local_database_configuration.clone())).expect("open db local"));
+    let mut local_database = Some(
+        Database::open("local", Some(local_database_configuration.clone())).expect("open db local"),
+    );
     assert!(Database::exists("local", tmp_dir.path()));
 
     // Central database
@@ -51,7 +53,8 @@ fn start_stop_delete_db_start() {
         encryption_key: None,
     };
 
-    let central_database = Database::open("central", Some(central_database_configuration)).expect("open db central");
+    let central_database =
+        Database::open("central", Some(central_database_configuration)).expect("open db central");
     assert!(Database::exists("central", tmp_dir.path()));
 
     // Start continuous replication
@@ -84,10 +87,18 @@ fn start_stop_delete_db_start() {
     replicator.as_mut().unwrap().start(false);
 
     // Add doc to local
-    utils::add_doc(local_database.as_mut().unwrap(), "foo", 1234, "Hello World!");
+    utils::add_doc(
+        local_database.as_mut().unwrap(),
+        "foo",
+        1234,
+        "Hello World!",
+    );
 
     // Check document is in central
-    assert!(utils::check_callback_with_wait(|| central_database.get_document("foo").is_ok(), None));
+    assert!(utils::check_callback_with_wait(
+        || central_database.get_document("foo").is_ok(),
+        None
+    ));
     println!("=== Document reached central ===");
 
     // Stop replicator
@@ -112,7 +123,8 @@ fn start_stop_delete_db_start() {
     println!("=== Database file deleted ===");
 
     // Recreate DB handle
-    local_database = Some(Database::open("local", Some(local_database_configuration)).expect("open db local"));
+    local_database =
+        Some(Database::open("local", Some(local_database_configuration)).expect("open db local"));
     assert!(Database::exists("local", tmp_dir.path()));
 
     // Start replication, non continuous this time
@@ -145,11 +157,17 @@ fn start_stop_delete_db_start() {
     println!("=== Non-continuous replicator started ===");
 
     // Wait and test the document was replicated to local database
-    assert!(utils::check_callback_with_wait(|| local_database.as_mut().unwrap().get_document("foo").is_ok(), None));
+    assert!(utils::check_callback_with_wait(
+        || local_database.as_mut().unwrap().get_document("foo").is_ok(),
+        None
+    ));
     println!("=== Document reached local ===");
 
     std::thread::sleep(Duration::from_secs(2));
-    println!("=== Replicator weird status: {:?} ===", replicator.as_ref().unwrap().status().activity);
+    println!(
+        "=== Replicator weird status: {:?} ===",
+        replicator.as_ref().unwrap().status().activity
+    );
 
     // Stop replicator - the replicator cannot be stopped, it stays in status Busy indefinitely
     let could_stop_replicator = replicator.as_mut().unwrap().stop(Some(20));
