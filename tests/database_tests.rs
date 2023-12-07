@@ -75,9 +75,11 @@ fn copy_file() {
     match Database::open(DB_NAME, Some(cfg.clone())) {
         Ok(mut db) => {
             let mut doc = Document::new_with_id("foo");
+
             let mut props = doc.mutable_properties();
             props.at("i").put_i64(1);
             props.at("s").put_string("test");
+
             db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
                 .expect("save");
         }
@@ -86,10 +88,10 @@ fn copy_file() {
     assert!(Database::exists(DB_NAME, tmp_dir.path()));
 
     // Copy DB
-    let new_path = tmp_dir.path().join(format!("{DB_NAME}.cblite2/"));
-    let cfg2 = Some(cfg.clone());
-    Database::copy_file(new_path.as_path(), DB_NAME_BACKUP, cfg2).expect("Database copy failed");
-    std::thread::sleep(Duration::from_secs(5));
+    let current_path = tmp_dir.path().join(format!("{DB_NAME}.cblite2/"));
+    Database::copy_file(current_path.as_path(), DB_NAME_BACKUP, Some(cfg.clone()))
+        .expect("Database copy failed");
+
     assert!(Database::exists(DB_NAME, tmp_dir.path()));
     assert!(Database::exists(DB_NAME_BACKUP, tmp_dir.path()));
 
@@ -97,6 +99,7 @@ fn copy_file() {
     match Database::open(DB_NAME_BACKUP, Some(cfg)) {
         Ok(db) => {
             let doc = db.get_document("foo").unwrap();
+
             assert_eq!(doc.properties().get("i").as_i64().unwrap(), 1);
             assert_eq!(doc.properties().get("s").as_string().unwrap(), "test");
         }
