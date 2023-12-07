@@ -19,6 +19,7 @@ extern crate couchbase_lite;
 
 use self::couchbase_lite::*;
 use encryptable::Encryptable;
+use std::{time::Duration, thread};
 
 pub mod utils;
 
