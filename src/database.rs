@@ -30,7 +30,7 @@ use crate::{
         kCBLEncryptionNone, kCBLMaintenanceTypeFullOptimize, kCBLMaintenanceTypeIntegrityCheck,
         kCBLMaintenanceTypeOptimize, kCBLMaintenanceTypeReindex, CBL_CopyDatabase,
     },
-    Listener, check_error,
+    Listener, check_error, Error, CouchbaseLiteError,
 };
 use std::path::{Path, PathBuf};
 use std::ptr;
@@ -195,30 +195,47 @@ impl Database {
         new_db_name: &str,
         config: Option<DatabaseConfiguration>,
     ) -> Result<()> {
-        unsafe {
-            let config = config.map(|cfg| {
-                let mut c_config: CBLDatabaseConfiguration = CBLDatabaseConfiguration_Default();
-                c_config.directory = from_str(cfg.directory.to_str().unwrap()).get_ref();
-                if let Some(encryption_key) = cfg.encryption_key {
-                    c_config.encryptionKey = *encryption_key.get_ref();
-                }
-                c_config
-            });
-            let config_param = config
-                .as_ref()
-                .map(|cfg| cfg as *const CBLDatabaseConfiguration)
-                .unwrap_or(ptr::null());
+        let config = config
+            .map(|cfg| {
+                let mut c_config: CBLDatabaseConfiguration =
+                    unsafe { CBLDatabaseConfiguration_Default() };
 
-            let mut error = CBLError::default();
+                c_config.directory = from_str(
+                    cfg.directory
+                        .to_str()
+                        .ok_or(Error::cbl_error(CouchbaseLiteError::InvalidParameter))?,
+                )
+                .get_ref();
+
+                if let Some(encryption_key) = cfg.encryption_key {
+                    c_config.encryptionKey = unsafe { *encryption_key.get_ref() };
+                }
+                Ok(c_config)
+            })
+            .transpose()?;
+
+        let config_param = config
+            .as_ref()
+            .map(|cfg| cfg as *const CBLDatabaseConfiguration)
+            .unwrap_or(ptr::null());
+
+        let mut error = CBLError::default();
+        unsafe {
             CBL_CopyDatabase(
-                from_str(current_db_full_path.as_ref().to_str().unwrap()).get_ref(),
+                from_str(
+                    current_db_full_path
+                        .as_ref()
+                        .to_str()
+                        .ok_or(Error::cbl_error(CouchbaseLiteError::InvalidParameter))?,
+                )
+                .get_ref(),
                 from_str(new_db_name).get_ref(),
                 config_param,
                 &mut error,
             );
-
-            check_error(&error)
         }
+
+        check_error(&error)
     }
 
     /** Deletes a database file. If the database file is open, an error is returned. */
