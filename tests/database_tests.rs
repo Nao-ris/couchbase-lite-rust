@@ -22,6 +22,7 @@ extern crate lazy_static;
 use self::couchbase_lite::*;
 use self::tempdir::TempDir;
 use lazy_static::lazy_static;
+use utils::init_logging;
 
 pub mod utils;
 
@@ -36,6 +37,74 @@ use std::{
 lazy_static! {
     static ref BUFFER_NOTIFICATIONS: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     static ref DOCUMENT_DETECTED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+}
+
+#[test]
+fn delete_file() {
+    pub const DB_NAME: &str = "test_db";
+
+    init_logging();
+
+    let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
+    let cfg = DatabaseConfiguration {
+        directory: tmp_dir.path(),
+        encryption_key: None,
+    };
+    if let Err(_) = Database::open(DB_NAME, Some(cfg)) {
+        panic!("The database could not be opened");
+    }
+    assert!(Database::exists(DB_NAME, tmp_dir.path()));
+
+    Database::delete_file(DB_NAME, tmp_dir.path()).expect("Database deletion failed");
+    assert!(!Database::exists(DB_NAME, tmp_dir.path()));
+}
+
+#[test]
+fn copy_file() {
+    pub const DB_NAME: &str = "test_db";
+    pub const DB_NAME_BACKUP: &str = "test_db_backup";
+
+    init_logging();
+
+    // Initial DB
+    let tmp_dir = TempDir::new("cbl_rust").expect("create temp dir");
+    let cfg = DatabaseConfiguration {
+        directory: tmp_dir.path(),
+        encryption_key: None,
+    };
+    match Database::open(DB_NAME, Some(cfg.clone())) {
+        Ok(mut db) => {
+            let mut doc = Document::new_with_id("foo");
+
+            let mut props = doc.mutable_properties();
+            props.at("i").put_i64(1);
+            props.at("s").put_string("test");
+
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::FailOnConflict)
+                .expect("save");
+        }
+        Err(_) => panic!("The initial database could not be opened"),
+    }
+    assert!(Database::exists(DB_NAME, tmp_dir.path()));
+
+    // Copy DB
+    let current_path = tmp_dir.path().join(format!("{DB_NAME}.cblite2/"));
+    Database::copy_file(current_path.as_path(), DB_NAME_BACKUP, Some(cfg.clone()))
+        .expect("Database copy failed");
+
+    assert!(Database::exists(DB_NAME, tmp_dir.path()));
+    assert!(Database::exists(DB_NAME_BACKUP, tmp_dir.path()));
+
+    // Check document is inside the new DB
+    match Database::open(DB_NAME_BACKUP, Some(cfg)) {
+        Ok(db) => {
+            let doc = db.get_document("foo").unwrap();
+
+            assert_eq!(doc.properties().get("i").as_i64().unwrap(), 1);
+            assert_eq!(doc.properties().get("s").as_string().unwrap(), "test");
+        }
+        Err(_) => panic!("The new database could not be opened"),
+    }
 }
 
 #[test]
