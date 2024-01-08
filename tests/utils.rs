@@ -111,6 +111,7 @@ fn generate_replication_configuration(
         trusted_root_certificates: None,
         channels: MutableArray::default(),
         document_ids: config.document_ids,
+        accept_parent_domain_cookies: false,
     }
 }
 

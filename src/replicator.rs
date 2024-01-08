@@ -513,6 +513,15 @@ pub struct ReplicatorConfiguration {
     //-- Filtering:
     pub channels: MutableArray, // Optional set of channels to pull from
     pub document_ids: MutableArray, // Optional set of document IDs to replicate
+    //-- Advanced HTTP settings:
+    /** The option to remove the restriction that does not allow the replicator to save the parent-domain
+    cookies, the cookies whose domains are the parent domain of the remote host, from the HTTP
+    response. For example, when the option is set to true, the cookies whose domain are “.foo.com”
+    returned by “bar.foo.com” host will be permitted to save. This is only recommended if the host
+    issuing the cookie is well trusted.
+    This option is disabled by default (see \ref kCBLDefaultReplicatorAcceptParentCookies) which means
+    that the parent-domain cookies are not permitted to save by default. */
+    pub accept_parent_domain_cookies: bool,
 }
 
 //======== LIFECYCLE
@@ -593,6 +602,7 @@ impl Replicator {
                     .property_decryptor
                     .as_ref()
                     .and(Some(c_property_decryptor)),
+                acceptParentDomainCookies: config.accept_parent_domain_cookies,
                 context: std::ptr::addr_of!(*context) as *mut _,
             };
 
