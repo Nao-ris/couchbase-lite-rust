@@ -88,7 +88,7 @@ fn copy_file() {
     assert!(Database::exists(DB_NAME, tmp_dir.path()));
 
     // Copy DB
-    let current_path = tmp_dir.path().join(format!("{DB_NAME}.cblite2/"));
+    let current_path = tmp_dir.path().join(format!("{DB_NAME}.cblite2"));
     Database::copy_file(current_path.as_path(), DB_NAME_BACKUP, Some(cfg.clone()))
         .expect("Database copy failed");
 
