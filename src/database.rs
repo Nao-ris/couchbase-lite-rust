@@ -381,6 +381,58 @@ impl Database {
             CBLDatabase_SendNotifications(self.get_ref());
         }
     }
+
+    /** Creates a new transaction that can be committed or rolled back manually.
+    Returns a Transaction object that must be committed explicitly, otherwise
+    it will be rolled back when dropped. */
+    pub fn begin_transaction(&mut self) -> Result<Transaction> {
+        Transaction::new(self.get_ref())
+    }
+}
+
+/** A database transaction that can be committed or rolled back.
+When dropped without being committed, the transaction is automatically rolled back. */
+pub struct Transaction {
+    db_ref: *mut CBLDatabase,
+    committed: bool,
+}
+
+impl Transaction {
+    fn new(db_ref: *mut CBLDatabase) -> Result<Self> {
+        unsafe {
+            let mut err = CBLError::default();
+            if !CBLDatabase_BeginTransaction(db_ref, &mut err) {
+                return failure(err);
+            }
+        }
+        Ok(Transaction {
+            db_ref,
+            committed: false,
+        })
+    }
+
+    /** Commits the transaction, making all changes permanent. */
+    pub fn commit(mut self) -> Result<()> {
+        unsafe {
+            let mut err = CBLError::default();
+            if !CBLDatabase_EndTransaction(self.db_ref, true, &mut err) {
+                return failure(err);
+            }
+        }
+        self.committed = true;
+        Ok(())
+    }
+}
+
+impl Drop for Transaction {
+    fn drop(&mut self) {
+        if !self.committed {
+            unsafe {
+                let mut err = CBLError::default();
+                let _ = CBLDatabase_EndTransaction(self.db_ref, false, &mut err);
+            }
+        }
+    }
 }
 
 impl Drop for Database {

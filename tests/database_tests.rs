@@ -135,6 +135,41 @@ fn in_transaction() {
 }
 
 #[test]
+fn manual_transaction_commit() {
+    utils::with_db(|db| {
+        let initial_count = db.count();
+
+        {
+            let transaction = db.begin_transaction().unwrap();
+            let mut doc = Document::new_with_id("manual_commit_doc");
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+                .unwrap();
+            transaction.commit().unwrap();
+        }
+
+        assert_eq!(db.count(), initial_count + 1);
+        assert!(db.get_document("manual_commit_doc").is_ok());
+    });
+}
+
+#[test]
+fn manual_transaction_rollback() {
+    utils::with_db(|db| {
+        let initial_count = db.count();
+
+        {
+            let _transaction = db.begin_transaction().unwrap();
+            let mut doc = Document::new_with_id("rollback_doc");
+            db.save_document_with_concurency_control(&mut doc, ConcurrencyControl::LastWriteWins)
+                .unwrap();
+        }
+
+        assert_eq!(db.count(), initial_count);
+        assert!(db.get_document("rollback_doc").is_err());
+    });
+}
+
+#[test]
 fn db_properties() {
     utils::with_db(|db| {
         assert_eq!(db.name(), utils::DB_NAME);
